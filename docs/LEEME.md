@@ -181,16 +181,21 @@ El sistema visual define cinco condiciones. En esta página se ven así:
 | Carga en curso | Bloque bajo el título del panel, con barra que avanza | Antes de que `app.js` arme el registro: está en el marcado, no se agrega después |
 | Error de carga | Bloque con marca tachada y borde óxido | El archivo de datos no llegó o no tiene la forma esperada |
 | Sin datos | Bloque bajo el título, y la celda «sin dato» de históricos | El archivo no trae registros, o un día de la serie no tiene total |
-| Dato antiguo | Marca en línea junto a la última publicación, en la fecha de publicación y en el estado del bloque de arriba | La publicación declarada tiene más de seis horas |
+| Dato antiguo | Marca en línea en el estado del bloque de arriba y en la fecha de publicación de la ficha | La publicación declarada tiene más de seis horas |
 | Período incompleto | Bloque bajo las cifras | La serie no cubre la ventana de 24 h que se informa |
 
 El detalle de cada pieza está en `panel-web/diseno/sistema.md` §8; la muestra navegable,
 en `panel-web/diseno/muestra.html`.
 
+El bloque de arriba agrega un estado propio del dato, que no es uno de los cinco del
+sistema visual: **sin fecha** (marca neutra), cuando el archivo tiene registros pero ni la
+publicación ni la última lectura del sensor tienen una fecha válida. En ese caso no se
+calcula ninguna antigüedad ni se dice «al día»: se escribe «sin fecha» y se explica por qué.
+
 ## 5.1 Cómo se lee la página
 
 Las secciones siguen el orden en que se necesita el dato: **Datos** (la última lectura, el
-acumulado de 24 h y el estado), **Registro** (ficha, gráfico, cifras, tabla y descargas),
+estado y el acumulado de 24 h), **Registro** (ficha, gráfico, cifras, tabla y descargas),
 **Estado del dato** (cuándo se publicó y si está al día o atrasado), **Instrumento** (cómo
 mide y de qué depende la lectura), **Formato** (los campos del archivo) e **Históricos**
 (series anteriores, aparte).
