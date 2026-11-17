@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="Maipo Vigía: panel de consulta del registro pluviométrico comunitario de San José de Maipo. Versión de prueba con datos simulados.">
+<title>Maipo Vigía · el registro de la lluvia</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32'%3E%3Crect x='6' y='2' width='12' height='28' rx='6' fill='none' stroke='%230E6C7C' stroke-width='2'/%3E%3Cpath d='M8 20h8v8a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z' fill='%230E6C7C'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/estilos.css">
+<script src="datos/registros.js" defer></script>
+<script src="datos/historicos.js" defer></script>
+<script src="assets/app.js" defer></script>
+</head>
+<body>
+
+<a class="salto" href="#registro">Ir al registro</a>
+
+<!-- La regla: índice de secciones con forma de tubo de precipitación -->
+<nav class="regla" aria-label="Secciones">
+  <div class="regla__tubo">
+    <div class="regla__agua" id="agua"></div>
+    <ol class="regla__marcas">
+      <li><a href="#portada" data-marca="portada" aria-current="location"><span>Portada</span></a></li>
+      <li><a href="#registro" data-marca="registro"><span>Registro</span></a></li>
+      <li><a href="#estado" data-marca="estado"><span>Estado</span></a></li>
+      <li><a href="#instrumento" data-marca="instrumento"><span>Instrumento</span></a></li>
+      <li><a href="#formato" data-marca="formato"><span>Formato</span></a></li>
+      <li><a href="#historicos" data-marca="historicos"><span>Históricos</span></a></li>
+      <li><a href="#bitacora" data-marca="bitacora"><span>Bitácora</span></a></li>
+    </ol>
+  </div>
+</nav>
+
+<header class="cabecera">
+  <div class="contenido cabecera__fila">
+    <a class="marca" href="#portada">
+      <svg class="marca__icono" viewBox="0 0 24 32" aria-hidden="true">
+        <rect x="6" y="2" width="12" height="28" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M8 20h8v8a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z" fill="currentColor"/>
+      </svg>
+      <span class="marca__texto">
+        <strong>Maipo Vigía</strong>
+        <span>Maipo Seguritos · Capstone Intermedio 2026</span>
+      </span>
+    </a>
+    <p class="cabecera__curso">Universidad Mayor · Desafío 09 · contraparte SERNAGEOMIN</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- 01 Portada -->
+  <section class="portada" id="portada">
+    <div class="contenido">
+      <h1>Medir la lluvia sirve poco<br>si el dato no llega</h1>
+      <p class="portada__entrada">
+        En San José de Maipo hay observadores que ya miden la lluvia a mano, pero el registro
+        se pierde cuando el temporal corta la conexión. <strong>Maipo Vigía</strong> propone un
+        pluviómetro automático que mide, fecha y guarda sin internet, y envía el dato por radio
+        a una estación del sector. Esta página es donde ese registro se va a consultar; por
+        ahora muestra un conjunto de prueba, porque el instrumento todavía no existe armado.
+      </p>
+
+      <dl class="ficha-corta">
+        <div>
+          <dt>Captación del embudo</dt>
+          <dd>154 cm² <span>14 cm de diámetro</span></dd>
+        </div>
+        <div>
+          <dt>Un milímetro de lluvia</dt>
+          <dd>15,4 mL <span>por cada milímetro</span></dd>
+        </div>
+        <div>
+          <dt>Resolución teórica</dt>
+          <dd>0,26 mm <span>sin medir todavía</span></dd>
+        </div>
+      </dl>
+
+      <p class="portada__aviso">
+        El registro que se muestra abajo es un conjunto de prueba. El instrumento todavía no
+        está armado: no hay sensor, no hay calibración y no hay mediciones reales.
+      </p>
+    </div>
+  </section>
+
+  <!-- 02 El registro -->
+  <section class="panel" id="registro" aria-labelledby="estacion-nombre">
+    <div class="contenido">
+
+      <p class="rotulo">
+        <span class="rotulo__marca">Datos simulados para prueba</span>
+        <span>No corresponden a una medición real.</span>
+      </p>
+
+      <!-- La cabecera del panel queda fuera de #panel-datos a propósito: si el
+           archivo no llega, la sección conserva su encabezado y lo que falla
+           es el contenido, no el título. -->
+      <div class="panel__cabeza">
+        <div>
+          <h2 class="panel__titulo" id="estacion-nombre">El registro del evento</h2>
+          <p class="panel__sub" id="estacion-detalle">—</p>
+        </div>
+        <p class="panel__reloj">
+          <span class="panel__etiqueta">Última publicación</span>
+          <span class="cifra" id="ultima-publicacion">—</span>
+          <span id="ultima-publicacion-edad"></span>
+        </p>
+      </div>
+
+      <!-- Carga en curso: el bloque está en el marcado antes de que lleguen los
+           datos, no después del error. app.js lo retira cuando termina. -->
+      <div class="estado estado--cargando" id="estado-carga" role="status">
+        <p class="estado__titulo">Cargando el registro</p>
+        <p class="estado__texto">
+          Se está leyendo el archivo de datos que está en esta misma carpeta. Mientras
+          tanto no se adelanta ninguna cifra.
+        </p>
+        <p class="estado__barra"></p>
+      </div>
+
+      <noscript>
+        <div class="estado estado--error">
+          <p class="estado__titulo">Esta página necesita JavaScript local para el registro</p>
+          <p class="estado__texto">
+            La tabla, el gráfico y las descargas los arma <code>assets/app.js</code>, que se
+            carga desde esta misma carpeta y no pide nada a la red. Sin él, el texto de las
+            secciones se lee igual, pero el registro no se arma. No es un problema de
+            conexión.
+          </p>
+        </div>
+      </noscript>
+
+      <!-- Error de carga: se muestra cuando el archivo de datos no llegó o no
+           tiene la forma que define panel-web/datos/formato_panel.py. -->
+      <div class="estado estado--error" id="estado-error" role="alert" hidden>
+        <p class="estado__titulo">El registro no se pudo leer</p>
+        <p class="estado__texto" id="estado-error-motivo">—</p>
+        <p class="estado__pie">
+          Se esperaba el archivo <code>datos/registros.js</code>, al lado de esta página. No
+          se pone una cifra en su lugar: sin dato no es cero.
+        </p>
+      </div>
+
+      <div class="estado estado--vacio" id="estado-vacio" hidden>
+        <p class="estado__titulo">Sin datos en el período</p>
+        <p class="estado__texto" id="estado-vacio-texto">—</p>
+      </div>
+
+      <div class="estado estado--vacio" id="estado-sin-sensor" hidden>
+        <p class="estado__titulo">Sin lecturas del sensor en este archivo</p>
+        <p class="estado__texto">
+          El archivo solo trae lecturas del lector manual. Con eso no se calcula acumulado,
+          intensidad ni gráfico: las filas se muestran tal como vienen, y nada más. Tampoco
+          se rellenan con cero.
+        </p>
+      </div>
+
+      <div class="estado estado--error" id="estado-puntos" hidden>
+        <p class="estado__titulo">El archivo mezcla puntos</p>
+        <p class="estado__texto" id="estado-puntos-texto">—</p>
+        <p class="estado__pie">
+          Los registros de puntos distintos no se suman entre sí: un acumulado así no
+          corresponde a ningún pluviómetro.
+        </p>
+      </div>
+
+      <div class="estado estado--error" id="estado-rechazos" role="status" aria-live="polite" hidden>
+        <p class="estado__titulo">Registros fuera del contrato</p>
+        <p class="estado__texto" id="estado-rechazos-texto">—</p>
+        <p class="estado__pie">
+          Un registro que no trae las siete claves del firmware, o que las trae con otro
+          tipo, no se muestra ni se completa a mano.
+        </p>
+      </div>
+
+      <!-- Los datos los arma app.js: hasta entonces el bloque no se muestra,
+           para no enseñar una ficha de guiones largos como si fuera un dato. -->
+      <div id="panel-datos" hidden>
+        <dl class="ficha-larga" aria-label="Ficha de la lectura">
+          <div><dt>Punto</dt><dd id="f-punto">—</dd></div>
+          <div><dt>Unidad</dt><dd id="f-unidad">—</dd></div>
+          <div><dt>Período</dt><dd id="f-periodo">—</dd></div>
+          <div><dt>Fuente</dt><dd id="f-fuente">—</dd></div>
+          <div><dt>Publicación del archivo</dt><dd id="f-publicacion">—</dd></div>
+        </dl>
+
+        <figure class="grafico" id="grafico-caja">
+          <figcaption class="grafico__leyenda">
+            <span class="llave llave--barra">Lluvia del registro del sensor</span>
+            <span class="llave llave--linea">Acumulado del tramo, que se reinicia al vaciar</span>
+          </figcaption>
+          <div id="lienzo" class="grafico__lienzo" role="img" aria-label="Gráfico del registro de lluvia"></div>
+        </figure>
+
+        <div class="cifras" id="cifras">
+          <div class="cifras__item" id="item-acumulado">
+            <p class="cifras__rotulo">Acumulado de 24 h</p>
+            <p class="cifras__valor cifra" id="c-acumulado">—</p>
+            <p class="cifras__nota" id="c-acumulado-nota">—</p>
+          </div>
+          <div class="cifras__item" id="item-total">
+            <p class="cifras__rotulo">Total del archivo</p>
+            <p class="cifras__valor cifra" id="c-total">—</p>
+            <p class="cifras__nota" id="c-total-nota">—</p>
+          </div>
+          <div class="cifras__item" id="item-intensidad">
+            <p class="cifras__rotulo">Intensidad media del período</p>
+            <p class="cifras__valor cifra" id="c-intensidad">—</p>
+            <p class="cifras__nota" id="c-intensidad-nota">—</p>
+          </div>
+          <div class="cifras__item" id="item-corte">
+            <p class="cifras__rotulo">Desde el vaciado del tubo</p>
+            <p class="cifras__valor cifra" id="c-desde-corte">—</p>
+            <p class="cifras__nota" id="c-desde-corte-nota">—</p>
+          </div>
+          <div class="cifras__item cifras__item--ancho" id="item-manual">
+            <p class="cifras__rotulo">Comparación con el pluviómetro manual</p>
+            <p class="cifras__valor cifra" id="c-manual">—</p>
+            <p class="cifras__nota" id="c-manual-nota">—</p>
+          </div>
+        </div>
+
+        <div class="estado estado--parcial" id="estado-periodo" hidden>
+          <p class="estado__titulo">Período incompleto</p>
+          <p class="estado__texto" id="estado-periodo-texto">—</p>
+          <p class="estado__pie" id="estado-periodo-pie">—</p>
+        </div>
+
+        <div class="acciones">
+          <div class="acciones__canal" role="group" aria-label="Filtrar las filas por canal">
+            <button type="button" class="boton boton--suave" data-filtro="todo" aria-pressed="true" aria-controls="tabla-registro">Todo</button>
+            <button type="button" class="boton boton--suave" data-filtro="automatico" aria-pressed="false" aria-controls="tabla-registro">Sensor</button>
+            <button type="button" class="boton boton--suave" data-filtro="manual" aria-pressed="false" aria-controls="tabla-registro">Lector manual</button>
+          </div>
+          <div class="acciones__descargas">
+            <button type="button" class="boton" id="btn-csv">Descargar CSV</button>
+            <button type="button" class="boton" id="btn-json">Descargar JSON</button>
+          </div>
+        </div>
+
+        <p class="panel__pie" id="filtro-estado" role="status">—</p>
+
+        <p class="panel__pie" id="panel-pie">—</p>
+
+        <div class="tabla-scroll" role="region" aria-label="Registro del evento: tabla que se recorre de lado" tabindex="0">
+          <table class="tabla" id="tabla-registro">
+            <caption class="tabla__titulo">Registro del evento, fila por fila. Punto: el <code>station_id</code> de cada fila. Canal: <code>automatico</code> es el sensor; <code>manual</code>, la lectura del observador.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Hora de medición</th>
+                <th scope="col" class="num">Lluvia (mm)</th>
+                <th scope="col" class="num">Acumulado del tramo (mm)</th>
+                <th scope="col" class="num">Temperatura (°C)</th>
+                <th scope="col">Punto</th>
+                <th scope="col">Canal</th>
+                <th scope="col">Revisión</th>
+                <th scope="col">Publicado</th>
+              </tr>
+            </thead>
+            <tbody><!-- lo llena app.js --></tbody>
+          </table>
+        </div>
+
+        <ul class="reglas">
+          <li>La hora de medición y la hora de publicación son distintas, y se muestran las dos.</li>
+          <li>El acumulado del tramo se reinicia cuando se vacía el tubo, y el vaciado queda marcado en su fila.</li>
+          <li>Un registro sin revisar se marca sin revisar. No se esconde ni se descarta.</li>
+          <li>Un período incompleto no se anuncia como acumulado completo: la ventana de 24 h se informa con lo que la serie cubre.</li>
+          <li>La intensidad es un promedio del período del archivo, no la intensidad de un intervalo.</li>
+          <li>El intervalo de 10 minutos lo declara el archivo, no el sketch: el de referencia emite un registro por pulsación, sin temporizador ni sueño entre mediciones.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 03 Estado -->
+  <section class="seccion" id="estado">
+    <div class="contenido">
+      <p class="seccion__numero">En qué va</p>
+      <h2>Estado del proyecto</h2>
+      <p class="entrada">
+        Lo que sigue no es una lista de deseos: es lo que existe hoy, con fecha. El diseño, el
+        formato y el plan están; el instrumento todavía no.
+      </p>
+
+      <table class="tabla tabla--estado">
+        <caption class="tabla__titulo">Estado al 17 de noviembre de 2026</caption>
+        <tbody>
+          <tr><th scope="row">Informe de la Unidad 2</th><td>Entregado el 27-10, calificado con 5,5. El reenvío con las correcciones sigue pendiente.</td></tr>
+          <tr><th scope="row">Kit de componentes</th><td>Recibido el 03-11.</td></tr>
+          <tr><th scope="row">Placas LoRa</th><td>Compra comunicada el 15-11. La recepción está pendiente de registrar en la bitácora: no hay fecha de recepción ni constancia en el repositorio. Falta confirmar la variante de frecuencia impresa en la placa y qué pines quedan libres en ese modelo.</td></tr>
+          <tr><th scope="row">Prototipo</th><td>Sin armar.</td></tr>
+          <tr><th scope="row">Firmware</th><td>Escrito y compilado contra <em>stubs</em>, probado con pulsaciones simuladas. No cargado en una placa real. El sketch de referencia no incluye la radio ni sueño entre mediciones.</td></tr>
+          <tr><th scope="row">Enlace LoRa</th><td>Sin probar: no hay transmisión, ni recepción, ni distancia medida. El procedimiento de prueba está escrito y su planilla de resultados está vacía.</td></tr>
+          <tr><th scope="row">Calibración</th><td>Pendiente. No hay mediciones del sensor.</td></tr>
+          <tr><th scope="row">Este panel</th><td>Primera versión, con datos simulados. No está conectado a ninguna estación.</td></tr>
+          <tr><th scope="row">Feria Capstone</th><td>Jueves 03-12-2026, con dos integrantes en el pitch y tres en el stand.</td></tr>
+        </tbody>
+      </table>
+
+      <p class="cierre">
+        La compra dejó de ser el cuello de botella. La recepción queda por registrar en la
+        bitácora; lo que sigue es armado, calibración y prueba de enlace, en ese orden, y nada
+        de eso está hecho todavía.
+      </p>
+    </div>
+  </section>
+
+  <!-- 04 Instrumento -->
+  <section class="seccion" id="instrumento">
+    <div class="contenido">
+      <p class="seccion__numero">Cómo mide</p>
+      <h2>El instrumento</h2>
+      <p class="entrada">
+        Un embudo recoge la lluvia y la lleva a un tubo. El agua sube, y un sensor ultrasónico
+        mide a qué altura está. El resto es aritmética y relojes.
+      </p>
+
+      <dl class="medidas">
+        <div><dt>Diámetro del embudo</dt><dd>14 cm</dd></div>
+        <div><dt>Área de captación</dt><dd>154 cm²</dd></div>
+        <div><dt>Volumen por milímetro de lluvia</dt><dd>15,4 mL</dd></div>
+        <div><dt>Diámetro del tubo</dt><dd>75 mm <span>interior cercano a 7,1 cm, por medir</span></dd></div>
+        <div><dt>Subida del agua por milímetro de lluvia</dt><dd>3,9 mm <span>relación de áreas 3,9:1, por medir</span></dd></div>
+        <div><dt>Resolución teórica del conjunto</dt><dd>0,26 mm <span>con resolución de sensor cercana a 1 mm; calculada, no medida</span></dd></div>
+        <div><dt>Valor de la demo del sketch (0,2 mm por evento)</dt><dd>0,2 mm <span>constante de simulación, no una medición</span></dd></div>
+      </dl>
+
+      <figure class="lamina">
+        <img src="img/diseno_conceptual.jpg" width="1100" height="634"
+             alt="Esquema del instrumento: embudo con malla, tubo, sensor ultrasónico bajo la tapa, caja estanca, panel solar y antena.">
+        <figcaption>
+          Diseño conceptual del instrumento, 25-10-2026. Es un dibujo de lo que se quiere
+          construir, no una foto del prototipo: no existe todavía. La relación de áreas de
+          3,9:1 es la del informe §4, calculada con un diámetro interior de tubo cercano a
+          7,1 cm que está por medir; esta página usa esa misma relación y no la da por
+          medida. El dibujo se conserva sin retocar.
+        </figcaption>
+      </figure>
+
+      <h3>Cómo viaja el dato</h3>
+      <p class="entrada">
+        Del tubo a esta página hay cinco eslabones. Cada uno dice en qué estado está: lo que
+        todavía no existe queda marcado como pendiente, y no se cuenta como si funcionara.
+      </p>
+      <ol class="flujo">
+        <li>
+          <strong>Embudo y tubo.</strong> La lluvia entra por una malla y cae al tubo. Cada
+          milímetro de lluvia sube el agua 3,9 mm, con el diámetro interior del tubo por
+          medir. <span class="pildora">Diseñado, sin armar</span>
+        </li>
+        <li>
+          <strong>Sensor ultrasónico.</strong> Va bajo la tapa, a más de 25 cm del agua, y mide
+          la distancia hasta la superficie. Los pines 26 y 33 son una propuesta: el sketch de
+          referencia no lo lee. <span class="pildora">Pendiente</span>
+        </li>
+        <li>
+          <strong>ESP32 con reloj.</strong> Convertiría la distancia en milímetros, fecharía con
+          el RTC y guardaría en la microSD. En el sketch de referencia el registro lo dispara un
+          botón y se escribe en el monitor serial y en la tarjeta.
+          <span class="pildora">En código, sin hardware</span>
+        </li>
+        <li>
+          <strong>Radio LoRa.</strong> Mandaría el registro a la estación del sector sin pasar
+          por internet, en tramas cortas. El sketch de referencia no incluye la radio.
+          <span class="pildora">No implementado</span>
+        </li>
+        <li>
+          <strong>Estación y panel.</strong> La estación recibiría, guardaría y publicaría una
+          copia revisada. La estación no existe; el panel es esta página.
+          <span class="pildora">Panel sí, estación no</span>
+        </li>
+      </ol>
+
+      <h3>Qué tiene el kit</h3>
+      <p class="entrada">
+        JSN-SR04T para el nivel, DS3231 para la fecha, DS18B20 para la temperatura, lector de
+        microSD, placa Heltec V3 con ESP32 y LoRa, pantalla LCD 1602, LEDs y un buzzer que solo
+        confirma acciones. Alimentación con batería 18650 y panel solar, dentro de una caja
+        estanca.
+      </p>
+
+      <h3>Qué vamos a probar, y con qué criterio</h3>
+      <table class="tabla">
+        <caption class="tabla__titulo">Metas del plan de pruebas. Ninguna está ejecutada.</caption>
+        <thead>
+          <tr><th scope="col">Prueba</th><th scope="col">Meta</th><th scope="col">Estado</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Error de medición con volúmenes conocidos</td><td>≤ 1 mm en cada punto (0 a 10 mm)</td><td><span class="pildora">Pendiente</span></td></tr>
+          <tr><td>Repetibilidad entre ciclos</td><td>Diferencia ≤ 1 mm entre el máximo y el mínimo</td><td><span class="pildora">Pendiente</span></td></tr>
+          <tr><td>Vaciado del tubo</td><td>Acumulado final de 10 ± 1 mm</td><td><span class="pildora">Pendiente</span></td></tr>
+          <tr><td>Transmisión a 10, 30 y 50 m</td><td>Recepción ≥ 95 %, sin duplicados</td><td><span class="pildora">Pendiente</span></td></tr>
+          <tr><td>Comprensión de esta página</td><td>Cuatro de cinco personas identifican punto, unidad, período, fuente y publicación</td><td><span class="pildora">Pendiente</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 05 Formato -->
+  <section class="seccion" id="formato">
+    <div class="contenido">
+      <p class="seccion__numero">Qué se guarda</p>
+      <h2>El formato del registro</h2>
+      <p class="entrada">
+        Todo registro guarda lo mismo, venga del sensor o del observador. Los nombres de
+        los campos son los que ya escribe el firmware, así que una medición real entra
+        sin traducir nada cuando exista.
+      </p>
+
+      <table class="tabla tabla--campos">
+        <caption class="tabla__titulo">Los siete campos que graba el dispositivo</caption>
+        <thead>
+          <tr><th scope="col">Campo</th><th scope="col">Tipo</th><th scope="col">Ejemplo</th><th scope="col">Para qué</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>id</code></td><td>texto</td><td>MV-SJM-0001</td><td>Identificar el registro. Lo emite el dispositivo y no es único entre reinicios: el simulador le pone la fecha, <code>MV-20261114-0016</code></td></tr>
+          <tr><td><code>station_id</code></td><td>texto</td><td>SJM-PLAZA-01</td><td>De qué punto viene</td></tr>
+          <tr><td><code>timestamp</code></td><td>ISO 8601 con zona</td><td>2026-11-14T20:30:00-03:00</td><td>Cuándo se midió. Sin desfase horario, el registro no entra</td></tr>
+          <tr><td><code>rainfall_mm</code></td><td>número</td><td>1.6</td><td>Cuánta lluvia trae el registro. Nunca vacío ni negativo</td></tr>
+          <tr><td><code>temperature_c</code></td><td>número o vacío</td><td>14.2</td><td>Corrección y contexto. Puede venir vacío y se muestra vacío</td></tr>
+          <tr><td><code>source</code></td><td>automatico o manual</td><td>automatico</td><td>Quién midió. El dispositivo siempre dice <code>automatico</code></td></tr>
+          <tr><td><code>verified</code></td><td>true o false</td><td>false</td><td>Si alguien ya lo revisó. El dispositivo siempre dice <code>false</code></td></tr>
+        </tbody>
+      </table>
+
+      <table class="tabla tabla--campos">
+        <caption class="tabla__titulo">Los cuatro que agrega la copia publicada</caption>
+        <thead>
+          <tr><th scope="col">Campo</th><th scope="col">Tipo</th><th scope="col">Ejemplo</th><th scope="col">Para qué</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>published_at</code></td><td>ISO 8601 con zona</td><td>2026-11-14T22:41:00-03:00</td><td>Cuándo se publicó, distinto de cuándo se midió</td></tr>
+          <tr><td><code>estado</code></td><td>texto</td><td>simulado</td><td>La condición del dato. No es el canal: el canal es <code>source</code></td></tr>
+          <tr><td><code>tube_empty</code></td><td>true o false</td><td>false</td><td>Si el tubo se vació en ese intervalo</td></tr>
+          <tr><td><code>note</code></td><td>texto o vacío</td><td>Se vació el tubo durante el intervalo.</td><td>Explicar una marca del registro. No se usa para medir</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Así se ve un registro</h3>
+      <pre class="codigo"><code>{
+  "id": "MV-20261114-0016",
+  "station_id": "SJM-PLAZA-01",
+  "timestamp": "2026-11-14T20:30:00-03:00",
+  "rainfall_mm": 1.6,
+  "temperature_c": 14.2,
+  "source": "automatico",
+  "verified": false,
+  "published_at": "2026-11-14T22:41:00-03:00",
+  "estado": "simulado",
+  "tube_empty": false,
+  "note": null
+}</code></pre>
+
+      <p class="nota">
+        La lluvia se guarda en milímetros, la fecha con zona horaria y el vacío como vacío.
+        Un dato que falta no se convierte en cero: son cosas distintas. La página lee estos
+        nombres tal cual, sin traducirlos, y descarta el registro que no los trae.
+      </p>
+    </div>
+  </section>
+
+  <!-- 06 Históricos -->
+  <section class="seccion" id="historicos">
+    <div class="contenido">
+      <p class="seccion__numero">Lo que ya existe</p>
+      <h2>Históricos</h2>
+      <p class="entrada">
+        Antes del proyecto ya había gente midiendo. Estos antecedentes viven en una vista
+        aparte, con su fuente a la vista, para que nadie los confunda con lo que mide el kit.
+      </p>
+
+      <div class="aviso-vacio" id="historico-estado">
+        <p class="aviso-vacio__titulo">Sin serie real incorporada</p>
+        <p>
+          Todavía no hay antecedentes ciudadanos cargados. Cuando exista una serie, se
+          identificará la fuente y su permiso de uso antes de publicarla. Mientras tanto se
+          muestra una serie ficticia, rotulada como tal, para probar la vista.
+        </p>
+      </div>
+
+      <table class="tabla">
+        <caption class="tabla__titulo">Serie ficticia de totales diarios, para prueba de la vista</caption>
+        <thead>
+          <tr><th scope="col">Día</th><th scope="col" class="num">Total del día</th><th scope="col">Fuente</th><th scope="col">Observación</th></tr>
+        </thead>
+        <tbody><!-- lo llena app.js --></tbody>
+      </table>
+
+      <ul class="reglas">
+        <li>Un total diario no se convierte en intensidad horaria. Son medidas distintas.</li>
+        <li>Los registros de otro punto no se usan como referencia del sensor.</li>
+        <li>Un vacío se conserva como vacío y se explica; no se rellena con cero.</li>
+        <li>Cada serie conserva su archivo original y su fuente.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 07 Bitácora -->
+  <section class="seccion" id="bitacora">
+    <div class="contenido">
+      <p class="seccion__numero">Cómo llegamos hasta acá</p>
+      <h2>Bitácora</h2>
+      <p class="entrada">
+        Once sesiones documentadas, de la formación del equipo a la organización de la feria.
+        Cada entrada está en el repositorio, con su fecha.
+      </p>
+
+      <ol class="linea" id="linea-bitacora">
+        <li><time>24-08</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S01.md">Identidad del equipo y desafío</a><span>Se forma Maipo Seguritos y se reparten los roles por disciplina.</span></li>
+        <li><time>08-09</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S02.md">Observación en terreno</a><span>Se mira cómo se mide hoy y dónde se pierde el dato.</span></li>
+        <li><time>22-09</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S03.md">Estado del arte y benchmark</a><span>Qué existe frente a lo que se propone.</span></li>
+        <li><time>06-10</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S04.md">Reunión con Sernageomin</a><span>La comunicación con conectividad limitada aparece como el problema central.</span></li>
+        <li><time>13-10</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S05.md">Sesión no realizada</a><span>Queda la constancia, con la reconstrucción de la clase siguiente.</span></li>
+        <li><time>19-10</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S06.md">Revisión de materiales</a><span>Se ordenan los componentes y se coordina la propuesta.</span></li>
+        <li><time>20-10</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S07.md">Se elige el pluviómetro automatizado</a><span>El semáforo y los nodos quedan como complementos.</span></li>
+        <li><time>23-10</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S08.md">Informe compartido</a><span>Preparación de la entrega de la Unidad 2.</span></li>
+        <li><time>25-10</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S09.md">Presentación provisional</a><span>Diez láminas y el esquema conceptual del instrumento.</span></li>
+        <li><time>03-11</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S10.md">Cierre de la Unidad 2</a><span>Nota 5,5, cinco observaciones y la llegada del kit sin placa LoRa.</span></li>
+        <li><time>10-11</time><a href="https://github.com/DrChifuu/MaipuSeguritos/blob/main/bitacora/S11.md">Presentación de avances</a><span>Se expone el estado y se reparte la feria: dos en el pitch, tres en el stand.</span></li>
+      </ol>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="contenido">
+    <div class="pie__columnas">
+      <div>
+        <p class="pie__titulo">Maipo Seguritos</p>
+        <p class="pie__texto">
+          Equipo Maipo Seguritos · Capstone Intermedio 2026, INGT1034, Universidad Mayor.
+          Desafío 09 con SERNAGEOMIN.
+        </p>
+      </div>
+      <div>
+        <p class="pie__titulo">Qué es esta página</p>
+        <p class="pie__texto">
+          El panel de consulta del registro. No emite alertas y no reemplaza a los organismos
+          oficiales. Muestra lo que el equipo revisó y publicó, con su fecha.
+        </p>
+      </div>
+      <div>
+        <p class="pie__titulo">Cómo se abrió</p>
+        <p class="pie__texto" id="modo">
+          Comprobando desde dónde se abrió…
+        </p>
+      </div>
+    </div>
+    <p class="pie__legal">
+      Todo el contenido de esta página es un conjunto de prueba. El proyecto no tiene
+      mediciones reales todavía.
+      <a href="https://github.com/DrChifuu/MaipuSeguritos">Repositorio del equipo</a>
+    </p>
+  </div>
+</footer>
+
+<script>
+  /* Respaldo mínimo: si assets/app.js no llega a ejecutarse (archivo bloqueado o error
+     de sintaxis), el bloque de carga no puede quedarse avanzando para siempre. No pide
+     nada a la red y no reemplaza a app.js: solo informa qué falta. */
+  window.setTimeout(function () {
+    if (window.__maipoIniciado) return;
+    var carga = document.getElementById('estado-carga');
+    var error = document.getElementById('estado-error');
+    var motivo = document.getElementById('estado-error-motivo');
+    if (carga) carga.hidden = true;
+    if (motivo) motivo.textContent = 'El archivo assets/app.js no se ejecutó, así que la ' +
+      'tabla, el gráfico y las descargas no se pueden armar.';
+    if (error) error.hidden = false;
+  }, 3000);
+</script>
+
+</body>
+</html>
