@@ -28,16 +28,24 @@ carpeta. No hay CDN, ni fuentes remotas, ni analítica, ni claves en el navegado
 
 ## 2. Publicarla
 
-El informe de la Unidad 2 declaró un sitio estático en GitHub Pages con la forma
-`https://<cuenta>.github.io/maipo-vigia/`. Hay dos caminos:
+**Está publicada** en GitHub Pages desde la carpeta `docs/` del repositorio
+`MaipuSeguritos`, en `https://drchifuu.github.io/MaipuSeguritos/`. El informe de la
+Unidad 2 había declarado la forma `https://<cuenta>.github.io/maipo-vigia/`; se eligió la
+carpeta `docs/` del repositorio que ya existía, así que la dirección publicada es la de
+este repositorio y no la que el informe prometió.
 
-| Camino | Qué implica |
-|---|---|
-| **Repositorio nuevo `maipo-vigia`** | Coincide con la dirección que dice el informe. Se copia el contenido de `sitio/` a la raíz del repositorio y se activa Pages en la rama principal. |
-| **Carpeta `docs/` en `MaipuSeguritos`** | Todo queda en el mismo repositorio que las bitácoras, pero la dirección cambia y no es la que el informe prometió. |
+Para republicar después de un cambio:
 
-Ninguno de los dos se ha hecho todavía. Mientras no exista el enlace, la página es un
-archivo local, no una publicación.
+```bash
+cd panel-web
+python3 publicar.py            # regenera los datos, revisa el sitio y copia a docs/
+cd ../MaipuSeguritos
+git add docs && git commit -m "Publica el panel Maipo Vigía"
+git push origin main           # Pages reconstruye el sitio en uno o dos minutos
+```
+
+`publicar.py` no hace commit: deja la copia revisada y recuerda el comando. La dirección
+publicada solo cambia cuando el commit llega a `main`.
 
 ## 3. Actualizar los datos
 
@@ -203,9 +211,11 @@ local):
   imagen y `aria-current` en el índice de secciones.
 - La impresión: la pantalla oscura se imprime en papel y la tabla completa cabe en la hoja.
 
+- La publicación en GitHub Pages (`https://drchifuu.github.io/MaipuSeguritos/`, desde
+  `docs/` de `main`) responde 200 y sirve los mismos archivos de `sitio/`.
+
 **No verificado:**
 
 - La prueba con cinco personas que exige el informe (cuatro deben identificar punto, unidad,
   período, fuente y publicación sin ayuda).
-- Publicación en GitHub Pages.
 - Conexión con una estación real, que no existe.
