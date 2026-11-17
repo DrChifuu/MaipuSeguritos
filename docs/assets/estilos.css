@@ -19,6 +19,7 @@
      12  pie
      13  adaptaciones
      14  impresión
+     15  lectura fácil · tarjetas de estación
 
    El sistema completo —dirección, tokens, escala, estados y clases— está
    documentado en panel-web/diseno/sistema.md.
@@ -57,30 +58,40 @@
   --papel: #e8edeb;
   --papel-alto: #f4f7f5;
   --tinta: #15212a;
-  --tinta-2: #4b5c65;
-  --tinta-3: #57666e;
+  --tinta-2: #33424b;   /* era #4b5c65 · 5,88:1 → ahora 9,63:1 sobre papel alto */
+  --tinta-3: #3b4a52;   /* era #57666e · 5,03:1 → ahora 8,51:1 */
   --linea: #c3cfcc;
 
+  /* El agua, en tres papeles: pigmento estructural, tinta sobre papel y tinta
+     sobre la pantalla oscura. La razón es la misma que la del ámbar: el
+     pigmento que dibuja un filete no alcanza para escribir una palabra. */
   --agua: #0e6474;
+  --agua-tinta: #0b5563;   /* texto sobre papel alto: 7,81:1 */
+  --agua-clara: #86d2dc;   /* texto sobre pantalla alto: 8,10:1 */
   --agua-tenue: #a9c9cd;
   --verde: #2a6349;
+  --verde-tinta: #22553c;  /* 8,00:1 sobre papel alto */
+  --verde-claro: #7fd0a5;  /* 7,58:1 sobre pantalla alto */
 
-  /* Ámbar en dos papeles: pigmento estructural y tinta legible.
+  /* Ámbar en tres papeles: pigmento estructural, tinta legible y ámbar claro.
      El ámbar de siempre (#a9680b) da 3,80:1 sobre papel: sirve para filetes
-     y marcas, no para texto. La tinta ámbar llega a 5,29:1. */
+     y marcas, no para texto. La tinta ámbar llega a 8,16:1. */
   --ambar: #a9680b;
-  --ambar-tinta: #8a5406;
+  --ambar-tinta: #6d4004;
   --ambar-claro: #f0c169;
 
   /* Óxido: la única familia nueva. No es rojo de alarma: es el color de una
-     teja mojada, y aparece solo cuando hay un error que el lector tiene que ver. */
-  --oxido: #8c2f22;
-  --oxido-claro: #e88a72;
+     teja mojada, y aparece solo cuando hay un error que el lector tiene que ver.
+     Se oscureció un paso (#8c2f22 daba 6,97:1, justo bajo AAA) y el claro subió
+     otro para llegar a 7:1 sobre la tarjeta oscura. */
+  --oxido: #7f2a1e;
+  --oxido-claro: #f4a794;
 
   --pantalla: #0f242c;
   --pantalla-alto: #14303a;
   --pantalla-tinta: #e7eff1;
-  --pantalla-suave: #9db4bb;
+  --pantalla-suave: #aec3c9;  /* era #9db4bb · 6,40:1 → ahora 7,56:1 sobre
+                                 la tarjeta oscura, que es el peor caso */
   --pantalla-linea: rgba(231, 239, 241, 0.16);
 
   /* Capa de superficie: lo que un componente necesita saber para funcionar
@@ -93,10 +104,15 @@
 
   /* Capa de pigmentos: el color que toma cada condición del dato. */
   --pigmento-neutro: var(--tinta-3);
+  --pigmento-logrado: var(--verde-tinta);
   --pigmento-aviso: var(--ambar-tinta);
   --pigmento-error: var(--oxido);
-  --pigmento-proceso: var(--agua);
+  --pigmento-proceso: var(--agua-tinta);
   --foco: var(--agua);
+
+  /* Superficie de una pieza que se apoya sobre otra: la tarjeta de estación. */
+  --superficie: var(--papel-alto);
+  --superficie-filete: var(--linea);
 
   /* El dato, en el gráfico. app.js dibuja el SVG con colores fijos en los
      atributos; estos tokens son los mismos valores y dejan que la impresión
@@ -111,24 +127,28 @@
     'Liberation Mono', monospace;
 
   /* Escala tipográfica.
-     Pasos de 1 px entre 12 y 15 (densidad para tablas y rótulos), de 2 px
-     hasta 19 (texto), y cuatro tramos fluidos para los titulares, que crecen
-     con la ventana pero tienen techo y piso. */
-  --t-2xs: 0.75rem;    /* 12 px · rótulos, encabezados de tabla, píldoras */
-  --t-xs: 0.8125rem;   /* 13 px · notas, pies de figura, marcas de estado */
-  --t-sm: 0.875rem;    /* 14 px · celdas, reglas de lectura, texto de apoyo */
-  --t-md: 0.9375rem;   /* 15 px · párrafos de lista */
-  --t-base: 1.0625rem; /* 17 px · cuerpo */
-  --t-lg: 1.1875rem;   /* 19 px · entrada de portada y subtítulos */
-  --t-xl: clamp(1.55rem, 1.18rem + 1.6vw, 2.2rem);   /* 24,8 → 35,2 */
-  --t-2xl: clamp(1.85rem, 1.3rem + 2.4vw, 2.85rem);  /* 29,6 → 45,6 */
-  --t-3xl: clamp(2.3rem, 1.4rem + 3.6vw, 4.05rem);   /* 36,8 → 64,8 */
+     Ningún texto baja de 16 px: el piso es --t-2xs. El cuerpo es de 20 px en
+     los tres anchos, porque el público incluye personas mayores y agrandar la
+     letra del navegador no puede ser el único camino. Los pasos de arriba son
+     fluidos, con piso y techo. */
+  --t-2xs: 1rem;       /* 16 px · piso absoluto: rótulos, pies, marcas */
+  --t-xs: 1.0625rem;   /* 17 px · notas, pies de figura, antigüedad */
+  --t-sm: 1.125rem;    /* 18 px · texto de apoyo, celdas, frases de estado */
+  --t-md: 1.1875rem;   /* 19 px · párrafos de lista */
+  --t-base: 1.25rem;   /* 20 px · cuerpo */
+  --t-lg: 1.5rem;      /* 24 px · subtítulos y nombre de la estación */
+  --t-xl: clamp(1.75rem, 1.35rem + 1.6vw, 2.25rem);   /* 28 → 36 */
+  --t-2xl: clamp(2rem, 1.45rem + 2.4vw, 3rem);        /* 32 → 48 */
+  --t-3xl: clamp(2.4rem, 1.5rem + 3.8vw, 4.2rem);     /* 38,4 → 67,2 */
+  --t-cifra: clamp(3rem, 1.9rem + 5.2vw, 4.5rem);     /* 48 → 72 · la lluvia */
 
-  /* Interlíneas: cuatro, una por trabajo. */
-  --ti-titular: 1.03;
-  --ti-titulo: 1.1;
-  --ti-compacto: 1.35;
-  --ti-texto: 1.62;
+  /* Interlíneas: cuatro, una por trabajo. Las de lectura se abren para que el
+     ojo no salte de línea; las de titular se cierran para que el bloque se
+     lea como una pieza. */
+  --ti-titular: 1.05;
+  --ti-titulo: 1.15;
+  --ti-compacto: 1.4;
+  --ti-texto: 1.65;
 
   /* Ritmo de espaciado: múltiplos de 4 px, en rem para que también respondan
      al tamaño de letra que elija quien lee. */
@@ -158,10 +178,14 @@
   --filete: var(--pantalla-linea);
 
   --pigmento-neutro: var(--pantalla-suave);
+  --pigmento-logrado: var(--verde-claro);
   --pigmento-aviso: var(--ambar-claro);
   --pigmento-error: var(--oxido-claro);
-  --pigmento-proceso: var(--grafico-linea);
+  --pigmento-proceso: var(--agua-clara);
   --foco: var(--ambar-claro);
+
+  --superficie: var(--pantalla-alto);
+  --superficie-filete: var(--pantalla-linea);
 }
 
 /* ------------------------------------------------------------------ 03 base */
@@ -327,7 +351,7 @@ code, pre { font-family: var(--mono); }
 
 .regla__marcas a:hover,
 .regla__marcas a:focus-visible,
-.regla__marcas a[aria-current] { color: var(--agua); }
+.regla__marcas a[aria-current] { color: var(--agua-tinta); }
 
 .regla__marcas a:hover::after,
 .regla__marcas a:focus-visible::after,
@@ -630,6 +654,42 @@ code, pre { font-family: var(--mono); }
   --tacha: 0px;
   animation: llena 2200ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
+
+/* Los tres estados que usa la tarjeta de estación, con los nombres del
+   archivo de datos. `sin_datos` dice que no hay mediciones; `al_dia`, que la
+   última publicación es de ahora; `atrasado`, que hay dato pero no es de hoy.
+   Se aceptan las dos grafías —con guion bajo y con guion— porque el archivo y
+   el marcado vienen de manos distintas, y una diferencia de un carácter no
+   puede dejar una tarjeta sin color ni ícono. */
+[data-estado='sin_datos'],
+[data-estado='sin-datos'] {
+  --pigmento: var(--pigmento-neutro);
+  --nivel: 0%;
+  --tacha: 0px;
+}
+
+[data-estado='al_dia'],
+[data-estado='al-dia'] {
+  --pigmento: var(--pigmento-logrado);
+  --nivel: 100%;
+  --tacha: 0px;
+}
+
+[data-estado='atrasado'],
+[data-estado='retrasado'] {
+  --pigmento: var(--pigmento-aviso);
+  --nivel: 100%;
+  --tacha: 0px;
+}
+
+/* El estado de acceso del lugar. No es un estado del dato y por eso no
+   reutiliza `data-estado`: el acceso lo informa una persona, con fuente y
+   hora, y se tiñe aparte. `sin_informacion` es gris y no verde: nadie ha
+   dicho que el camino esté abierto. */
+[data-acceso='abierto'] { --pigmento: var(--pigmento-logrado); }
+[data-acceso='restringido'] { --pigmento: var(--pigmento-aviso); }
+[data-acceso='sin_informacion'],
+[data-acceso='sin-informacion'] { --pigmento: var(--pigmento-neutro); }
 
 /* El agua sube y vuelve a bajar. Solo se puede animar porque --nivel está
    registrada con @property; donde no lo esté, la marca queda en el nivel
@@ -943,7 +1003,7 @@ code, pre { font-family: var(--mono); }
 /* tabla de campos */
 
 .tabla--campos td:first-child { white-space: nowrap; }
-.tabla--campos code { font-size: var(--t-xs); color: var(--agua); }
+.tabla--campos code { font-size: var(--t-xs); color: var(--agua-tinta); }
 
 .tabla--estado th[scope='row'] {
   font-weight: 600;
@@ -1017,7 +1077,7 @@ code, pre { font-family: var(--mono); }
 }
 
 .pie__legal a {
-  color: var(--agua);
+  color: var(--agua-tinta);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
@@ -1080,7 +1140,8 @@ code, pre { font-family: var(--mono); }
 }
 
 @media (max-width: 720px) {
-  body { font-size: 1rem; }
+  /* El cuerpo no se achica en el celular: 20 px en los tres anchos. Antes
+     bajaba a 16 y la letra quedaba justo en el límite de lo legible. */
   .cabecera__curso { display: none; }
   .acciones { flex-direction: column; align-items: stretch; }
   .acciones__canal, .acciones__descargas { display: flex; }
@@ -1233,9 +1294,10 @@ code, pre { font-family: var(--mono); }
     --pigmento-neutro: var(--tinta-3);
     --pigmento-aviso: var(--ambar-tinta);
     --pigmento-error: var(--oxido);
-    --pigmento-proceso: var(--agua);
+    --pigmento-proceso: var(--agua-tinta);
+    --pigmento-logrado: var(--verde-tinta);
   }
-  .panel a { color: var(--agua); }
+  .panel a { color: var(--agua-tinta); }
 
   .rotulo__marca { color: var(--ambar-tinta); border-color: currentColor; }
   .marca-fila { color: var(--ambar-tinta); }
@@ -1301,6 +1363,528 @@ code, pre { font-family: var(--mono); }
   .lamina img { border: 1px solid var(--linea); }
   .codigo { background: #ffffff; border: 1px solid var(--linea); }
 }
+
+/* --------------------------- 15 lectura fácil · tarjetas de estación */
+
+/* El tablero de la red. Una tarjeta por punto, todas del mismo alto, y las dos
+   preguntas que se hace quien mira —¿está lloviendo? ¿se puede llegar?—
+   respondidas con palabras, cifras grandes y marcas dibujadas con reglas.
+
+   Nada de lo que sigue depende de un `hover`: la información está a la vista o
+   a un clic, nunca detrás del puntero. Ningún estado se apoya solo en el color:
+   cada uno lleva su palabra y su marca, y el texto va en tinta, que es lo que
+   más contrasta.
+
+   EL MARCADO QUE ESPERA. El constructor arma el resto y puede cambiar el orden
+   de los hijos, nunca los nombres ni los atributos:
+
+   <section class="tablero" aria-labelledby="tablero-titulo">
+     <div class="tablero__cabeza">
+       <h2 class="tablero__titulo" id="tablero-titulo">Los puntos de la red</h2>
+       <p class="tablero__bajada">…</p>
+       <p class="tablero__cuenta">6 puntos · última publicación 16-11-2026, 14:40</p>
+     </div>
+
+     <div class="tablero__rejilla">
+       <article class="estacion" data-estado="al_dia">
+         <h3 class="estacion__nombre">Plaza de Armas</h3>
+         <p class="estacion__lugar">Quebrada de San José · 1.080 m</p>
+
+         <p class="estacion__rotulo">Lluvia de ahora</p>
+         <p class="estacion__valor cifra">0,0 <span class="estacion__unidad">mm</span></p>
+         <p class="estacion__cuando">Midió a las 14:32 del 16-11</p>
+
+         <p class="estacion__acumulado">
+           <span class="estacion__acumulado-rotulo">En 24 h</span>
+           <span class="estacion__acumulado-valor cifra">24,0 mm</span>
+         </p>
+
+         <div class="estacion__estados">
+           <p class="estado-dato">
+             <span class="estado-dato__marca" aria-hidden="true"></span>
+             <span class="estado-dato__texto">Dato al día</span>
+           </p>
+           <p class="acceso" data-acceso="abierto">
+             <span class="acceso__marca" aria-hidden="true"></span>
+             <span class="acceso__texto">Acceso abierto</span>
+             <span class="acceso__fuente">Informado por la municipalidad el 16-11 a las 08:10</span>
+           </p>
+         </div>
+       </article>
+     </div>
+   </section>
+
+   El estado del dato va en `data-estado` de la tarjeta: sin_datos · al_dia ·
+   atrasado · parcial · error · cargando. El del acceso va en `data-acceso` del
+   bloque `.acceso`: abierto · restringido · sin_informacion. */
+
+.tablero { margin-top: var(--e-6); }
+
+.tablero__cabeza { max-width: 70ch; }
+
+/* El titular del tablero no hereda el tope de 22 caracteres de las secciones:
+   necesita decir qué es la rejilla en una línea. */
+.tablero .tablero__titulo {
+  font-family: var(--serif);
+  font-size: var(--t-2xl);
+  line-height: var(--ti-titulo);
+  max-width: 30ch;
+  margin: 0;
+}
+
+.tablero__bajada {
+  margin-top: var(--e-3);
+  font-size: var(--t-base);
+  line-height: var(--ti-texto);
+  color: var(--texto-2);
+  max-width: 58ch;
+}
+
+/* Cuántos puntos hay y de cuándo es lo publicado. No es un pie de página: es
+   la fecha del archivo, y sin ella ninguna tarjeta se puede leer bien. */
+.tablero__cuenta {
+  margin-top: var(--e-2);
+  font-size: var(--t-xs);
+  line-height: var(--ti-compacto);
+  color: var(--texto-3);
+}
+
+/* La rejilla: una columna en 360, dos desde 700 y tres desde 1100 —que es lo
+   que da 1280 con el carril del índice descontado—. `minmax(0, 1fr)` evita que
+   un nombre largo estire una columna y desborde la página. */
+.tablero__rejilla {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--e-4);
+  margin-top: var(--e-5);
+  align-items: stretch;
+}
+
+@media (min-width: 700px) {
+  .tablero__rejilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--e-5);
+  }
+}
+
+@media (min-width: 1100px) {
+  .tablero__rejilla { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* la tarjeta */
+
+.estacion {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;              /* sin esto, un nombre largo abre la columna */
+  padding: var(--e-4);
+  background: var(--superficie);
+  border: 1px solid var(--superficie-filete);
+  color: var(--texto);
+}
+
+/* El nombre y la quebrada: lo primero que se lee y lo que hay que poder decir
+   en voz alta. */
+.estacion .estacion__nombre {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--t-lg);
+  line-height: var(--ti-titulo);
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+.estacion__lugar {
+  margin-top: var(--e-1);
+  font-size: var(--t-xs);
+  line-height: var(--ti-compacto);
+  color: var(--texto-2);
+  overflow-wrap: break-word;
+}
+
+/* Un punto propuesto no es una estación funcionando: no tiene sensor, no tiene
+   lecturas y no hubo visita. Va en la tarjeta, con palabras y antes de las
+   cifras, para que nadie lea «sin datos» como un aparato averiado.
+   Clase nueva: `.estacion__propuesto`. */
+.estacion__propuesto {
+  margin-top: var(--e-2);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  line-height: var(--ti-compacto);
+  color: var(--texto-2);
+}
+
+/* La cifra de lluvia. Es el número más grande de la página: 48 px en el
+   celular y 72 en el monitor, con cifras tabulares para que no bailen entre
+   tarjetas. */
+.estacion__rotulo {
+  margin-top: var(--e-3);
+  padding-top: var(--e-2);
+  border-top: 1px solid var(--superficie-filete);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  line-height: var(--ti-compacto);
+  color: var(--texto-2);
+}
+
+.estacion__valor {
+  margin-top: var(--e-2);
+  font-family: var(--serif);
+  /* 48 px en el celular y 56 en el monitor: dentro del tramo de la cifra, pero
+     un paso abajo para que tres tarjetas convivan en una fila sin ahogarse. */
+  font-size: min(var(--t-cifra), 3.5rem);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  overflow-wrap: break-word;
+}
+
+.estacion__unidad {
+  font-family: var(--sans);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.estacion__cuando {
+  margin-top: var(--e-1);
+  font-size: var(--t-2xs);
+  line-height: 1.35;
+  color: var(--texto-2);
+}
+
+/* El acumulado de 24 h: rótulo y cifra en la misma línea, y si no caben, la
+   cifra baja entera en vez de partirse. */
+.estacion__acumulado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--e-1) var(--e-3);
+  margin-top: var(--e-2);
+  padding-top: var(--e-2);
+  border-top: 1px solid var(--superficie-filete);
+}
+
+.estacion__acumulado-rotulo {
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  line-height: var(--ti-compacto);
+  color: var(--texto-2);
+}
+
+.estacion__acumulado-valor {
+  font-family: var(--serif);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Si no hay acumulado, en su lugar va la palabra «Sin datos», no un guion solo:
+   un guion sin explicación se lee como un cero mal escrito. */
+.estacion[data-estado='sin_datos'] .estacion__acumulado-valor,
+.estacion[data-estado='sin-datos'] .estacion__acumulado-valor,
+.estacion[data-estado='vacio'] .estacion__acumulado-valor,
+.estacion[data-estado='error'] .estacion__acumulado-valor,
+.estacion[data-estado='cargando'] .estacion__acumulado-valor {
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  white-space: normal;
+  color: var(--texto-2);
+}
+
+/* Los dos estados, al pie y a la misma altura en todas las tarjetas: si una
+   tiene menos líneas, el aire sobrante queda arriba y las filas de abajo no
+   bailan. */
+.estacion__estados {
+  display: grid;
+  gap: var(--e-2);
+  margin-top: auto;
+  padding-top: var(--e-3);
+}
+
+/* Cuando en el lugar de la cifra hay una palabra —«Sin datos», «No cargó», un
+   guion largo— se escribe al tamaño de los subtítulos, no al de la cifra: una
+   palabra de 64 px se parte en dos líneas y una cifra que no existe no se
+   grita. Las tarjetas con número conservan la cifra grande. */
+.estacion[data-estado='sin_datos'] .estacion__valor,
+.estacion[data-estado='sin-datos'] .estacion__valor,
+.estacion[data-estado='vacio'] .estacion__valor,
+.estacion[data-estado='error'] .estacion__valor,
+.estacion[data-estado='cargando'] .estacion__valor {
+  font-family: var(--sans);
+  font-size: var(--t-xl);
+  line-height: 1.15;
+  color: var(--texto-2);
+}
+
+.estacion[data-estado='sin_datos'] .estacion__unidad,
+.estacion[data-estado='sin-datos'] .estacion__unidad,
+.estacion[data-estado='vacio'] .estacion__unidad,
+.estacion[data-estado='error'] .estacion__unidad,
+.estacion[data-estado='cargando'] .estacion__unidad { display: none; }
+
+/* Una línea de matiz, opcional: para decir en la propia tarjeta que un 0,0 es
+   una medición y no un hueco. */
+.estacion__nota {
+  margin-top: var(--e-2);
+  font-size: var(--t-2xs);
+  line-height: var(--ti-compacto);
+  color: var(--texto-2);
+}
+
+/* La tarjeta no es un botón: la acción es un enlace visible, con nombre
+   propio, que dice a dónde lleva. Se toca con el pulgar (44 px) y se alcanza
+   con el teclado. Si el constructor no necesita la acción, no se usa. */
+.estacion a.estacion__accion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: var(--e-4);
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid currentColor;
+  color: var(--texto);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .estacion a.estacion__accion:hover { background: var(--texto); color: var(--superficie); }
+}
+
+/* los dos estados: receta común, marcas distintas */
+
+/* El filete de 3 px a la izquierda, la marca, la palabra y —cuando la hay— la
+   fuente. El pigmento lo pone la tarjeta (`data-estado`) o el propio bloque
+   (`data-acceso`); el texto va en tinta, que es lo que más contrasta. */
+.estado-dato,
+.acceso {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--e-3);
+  row-gap: 2px;
+  align-items: start;
+  margin: 0;
+  padding: 2px 0 2px var(--e-3);
+  border-left: 3px solid var(--pigmento, var(--pigmento-neutro));
+  font-size: var(--t-sm);
+  line-height: var(--ti-compacto);
+  color: var(--texto);
+}
+
+.estado-dato__marca,
+.acceso__marca {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: block;
+  color: var(--pigmento, var(--pigmento-neutro));
+}
+
+.estado-dato__texto,
+.acceso__texto {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: var(--ti-compacto);
+  color: var(--texto);
+}
+
+.estado-dato__nota,
+.acceso__fuente {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: var(--t-2xs);
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--texto-2);
+}
+
+/* La marca del dato es la columna de precipitación del índice lateral, a
+   15 × 24 px: cuánta agua tiene dice cuánto hay, la tacha dice que no se pudo
+   leer. Es redundante a propósito —la palabra de al lado ya lo dice— y va
+   oculta a los lectores de pantalla. */
+.estado-dato__marca {
+  width: 15px;
+  height: 24px;
+  margin-top: 1px;
+  border: 2px solid currentColor;
+  background-image:
+    linear-gradient(currentColor, currentColor),
+    linear-gradient(45deg,
+      transparent calc(50% - 1px),
+      currentColor calc(50% - 1px),
+      currentColor calc(50% + 1px),
+      transparent calc(50% + 1px));
+  background-repeat: no-repeat;
+  background-position: 0 100%, center;
+  background-size: 100% var(--nivel, 0%), var(--tacha, 0px) var(--tacha, 0px);
+}
+
+/* La marca del acceso es otra familia, para que a un metro de distancia no se
+   confunda con la del dato: un visto, una X y un signo de pregunta. La X dice
+   «no está libre»; la palabra y la nota del acceso precisan si es una
+   restricción o un cierre. */
+.acceso__marca {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  background: currentColor;
+}
+
+.acceso[data-acceso='abierto'] .acceso__marca {
+  clip-path: polygon(8% 52%, 0 64%, 37% 100%, 100% 20%, 90% 9%, 37% 78%);
+}
+
+.acceso[data-acceso='restringido'] .acceso__marca {
+  background: none;
+  background-image:
+    linear-gradient(45deg,
+      transparent calc(50% - 1.6px),
+      currentColor calc(50% - 1.6px),
+      currentColor calc(50% + 1.6px),
+      transparent calc(50% + 1.6px)),
+    linear-gradient(-45deg,
+      transparent calc(50% - 1.6px),
+      currentColor calc(50% - 1.6px),
+      currentColor calc(50% + 1.6px),
+      transparent calc(50% + 1.6px));
+}
+
+/* «No sé» no se dibuja con una forma que parezca una respuesta: va el signo de
+   pregunta, que es la marca universal de la duda. */
+.acceso[data-acceso='sin_informacion'] .acceso__marca,
+.acceso[data-acceso='sin-informacion'] .acceso__marca {
+  display: grid;
+  place-items: center;
+  background: none;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.acceso[data-acceso='sin_informacion'] .acceso__marca::after,
+.acceso[data-acceso='sin-informacion'] .acceso__marca::after { content: '?'; }
+
+/* «Cómo leer este tablero» */
+
+/* Existe porque tres de las cosas que muestra el tablero se pueden leer al
+   revés: «sin datos» como «no llovió», un cero como «no hay dato» y «acceso
+   sin información» como «camino abierto». Frases cortas, la que importa
+   primero y en negrita. */
+.como-leer {
+  margin-top: var(--e-6);
+  border-top: 2px solid var(--pigmento-proceso);
+  max-width: 72ch;
+}
+
+.como-leer .como-leer__titulo {
+  margin: 0;
+  padding-top: var(--e-4);
+  font-family: var(--serif);
+  font-size: var(--t-xl);
+  line-height: var(--ti-titulo);
+  max-width: none;
+}
+
+.como-leer__lista {
+  list-style: none;
+  margin: var(--e-4) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--e-3);
+  font-size: var(--t-base);
+  line-height: var(--ti-texto);
+  color: var(--texto-2);
+}
+
+.como-leer__lista li {
+  position: relative;
+  padding-left: var(--e-4);
+  max-width: 62ch;
+}
+
+.como-leer__lista li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.8em;
+  width: 10px;
+  height: 1px;
+  background: currentColor;
+}
+
+.como-leer__lista strong {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+@media (min-width: 1100px) {
+  .como-leer { max-width: none; }
+  .como-leer__lista {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--e-6);
+  }
+}
+
+/* Quien pide más contraste lo recibe también en las tarjetas. */
+@media (prefers-contrast: more) {
+  :root {
+    --agua-tinta: #083f49;
+    --verde-tinta: #1b4632;
+  }
+  .panel {
+    --agua-clara: #a6e3ec;
+    --verde-claro: #a6e8c6;
+    --oxido-claro: #ffbfae;
+  }
+}
+
+/* En papel las tarjetas se vuelven blancas, van de a dos por fila y la cifra
+   baja a tamaño de hoja; ninguna se parte entre dos páginas. */
+@media print {
+  /* En papel la rejilla deja de ser grid: Chromium no respeta `break-inside`
+     en un ítem de grid y una tarjeta se partía entre dos hojas. Con bloques
+     flotantes la regla sí se respeta y cada tarjeta cae entera. */
+  .tablero__rejilla { display: block; }
+  .tablero__rejilla::after { content: ''; display: block; clear: both; }
+  .estacion {
+    float: left;
+    width: calc(50% - var(--e-2));
+    margin: 0 var(--e-2) var(--e-3) 0;
+    padding: var(--e-3);
+    break-inside: avoid;
+
+    --superficie: #ffffff;
+    --superficie-filete: var(--linea);
+    --texto: var(--tinta);
+    --texto-2: var(--tinta-2);
+    --texto-3: var(--tinta-3);
+    --pigmento-neutro: var(--tinta-3);
+    --pigmento-logrado: var(--verde-tinta);
+    --pigmento-aviso: var(--ambar-tinta);
+    --pigmento-error: var(--oxido);
+    --pigmento-proceso: var(--agua-tinta);
+  }
+  .estacion:nth-child(2n) { margin-right: 0; }
+  .estacion__valor { font-size: 2rem; }
+  .estacion__propuesto { color: var(--tinta-2); }
+  .estacion__acumulado-valor { font-size: 1.2rem; }
+  .estado-dato__marca { width: 12px; height: 18px; }
+  .acceso__marca { width: 16px; height: 16px; }
+  .como-leer__lista { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Consecuencia del aumento de letra: la marca que acompaña al acumulado
+   («ventana incompleta») ya no cabe en una línea a 360 px y empujaba la página
+   16 px hacia el costado. Se deja partir en palabras en vez de desbordar. */
+.panel .hero-dato__item-valor .marca-dato { white-space: normal; }
 
 /* === Extensiones del constructor === */
 /* Lo que el sistema visual no podía resolver solo porque vive en el marcado o
@@ -1408,7 +1992,9 @@ code, pre { font-family: var(--mono); }
 
 .hero-dato__valor {
   font-family: var(--serif);
-  font-size: clamp(2.6rem, 7vw, 4.2rem);
+  /* La cifra de lluvia manda: 48 px en el celular y 72 en el monitor, el mismo
+     tramo que usa la tarjeta de estación. */
+  font-size: var(--t-cifra);
   line-height: 1;
   margin-top: var(--e-2);
 }
@@ -1504,20 +2090,164 @@ code, pre { font-family: var(--mono); }
 /* En 360 mandan el dato y su estado: la lectura ocupa la fila entera y las dos
    cifras quedan una al lado de la otra para que se lean sin desplazarse. */
 @media (max-width: 560px) {
-  /* Menos aire arriba para que el dato entre en la primera pantalla. La lectura
-     va arriba; el estado y el acumulado comparten la fila siguiente, con la
-     columna del acumulado ancha para que su salvedad quepa al lado del número. */
+  /* En 360 el dato, su estado y el acumulado van uno debajo del otro. Con la
+     letra a 20 px, dos columnas de 155 px obligaban a partir cada frase en
+     cuatro renglones. La cifra no baja del piso de 48 px. */
   .panel { padding-block: var(--e-5) var(--e-6); }
-  .hero-dato { margin-top: var(--e-4); grid-template-columns: 1fr 1fr; }
-  .hero-dato > div { padding-right: var(--e-3); }
-  .hero-dato__principal {
-    grid-column: 1 / -1;
+  .hero-dato { margin-top: var(--e-4); grid-template-columns: minmax(0, 1fr); }
+  .hero-dato > div {
+    padding: var(--e-3) 0;
     border-right: 0;
     border-bottom: 1px solid var(--pantalla-linea);
-    padding-right: 0;
   }
-  .hero-dato > div:nth-child(2) { border-right: 1px solid var(--pantalla-linea); }
-  .hero-dato > div:nth-child(3) { border-right: 0; padding-right: 0; }
-  .hero-dato__valor { font-size: clamp(2.4rem, 15vw, 3.2rem); }
-  .hero-dato__item-valor { font-size: var(--t-lg); }
+  .hero-dato > div:first-child { padding-top: 0; }
+  .hero-dato > div:last-child { border-bottom: 0; padding-bottom: 0; }
+  .hero-dato__principal { grid-column: auto; }
+  .hero-dato__valor { font-size: clamp(3rem, 16vw, 3.4rem); }
+  .hero-dato__item-valor { font-size: var(--t-xl); }
+}
+
+/* --- Tablero multiestación y detalle del punto seleccionado --- */
+
+/* Cuando en el lugar de la cifra va una palabra que no es una medición
+   —«No disponible»— no se escribe al tamaño de la cifra: se lee como texto. */
+.estacion__valor--texto {
+  font-family: var(--sans);
+  font-size: var(--t-xl);
+  line-height: 1.15;
+  color: var(--texto-2);
+}
+
+/* El detalle del punto: el selector con los nombres, la confirmación de qué se
+   está viendo y los dos estados del punto elegido. */
+.detalle__selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+  margin-top: var(--e-4);
+  max-width: 72ch;
+}
+
+.detalle__selector .boton {
+  font-size: var(--t-sm);
+  min-height: 44px;
+}
+
+.detalle__viendo {
+  margin-top: var(--e-3);
+  font-size: var(--t-xs);
+  color: var(--pantalla-suave);
+  line-height: var(--ti-compacto);
+}
+
+.detalle__estados {
+  display: grid;
+  gap: var(--e-2);
+  margin-top: var(--e-3);
+  max-width: 72ch;
+}
+
+/* El pie del gráfico con los vaciados y las lecturas manuales: texto visible,
+   a 16 px, para no depender del puntero ni de un título emergente. */
+.grafico__eventos {
+  margin: 0 0 var(--e-3);
+  font-size: var(--t-2xs);
+  color: var(--pantalla-suave);
+  line-height: var(--ti-compacto);
+  max-width: 76ch;
+}
+
+/* En papel no hay nada que elegir: se imprime el punto que quedó seleccionado. */
+@media print {
+  .detalle__selector { display: none; }
+}
+
+/* El titular del tablero y la línea de cuenta no se recortan a 30ch/70ch: en
+   1280 el titular cabe en un renglón y la cuenta, que es la fecha del archivo y
+   el enlace a «Cómo leer», también. La bajada conserva su medida de lectura. */
+.tablero__cabeza { max-width: none; }
+
+.tablero .tablero__titulo {
+  max-width: none;
+  text-wrap: pretty;
+}
+
+/* La bajada del tablero: la medida de lectura del resto de la página (66ch),
+   para que las dos frases quepan en dos renglones y no empujen la rejilla
+   fuera de la primera pantalla. */
+.tablero__bajada { max-width: 66ch; }
+
+/* El rótulo del selector, visible: los botones son nombres de lugares, y sin
+   rótulo no se sabe que eligen el detalle. */
+.detalle__rotulo {
+  margin-top: var(--e-4);
+  font-size: var(--t-sm);
+  color: var(--pantalla-suave);
+  line-height: var(--ti-compacto);
+}
+
+.detalle__selector { margin-top: var(--e-2); }
+
+/* La primera fila del tablero entra completa en 1280×800 y la segunda asoma
+   unos píxeles: el borde de la fila siguiente dice que hay más puntos. Se
+   ajusta solo el aire entre la cabecera y el tablero, no la letra. */
+.tablero {
+  margin-top: var(--e-4);
+  padding-bottom: 0;
+}
+
+.tablero__rejilla { margin-top: var(--e-4); }
+
+/* --- A 360: primero el nombre, la cifra y los dos estados --- */
+
+/* La cifra no puede quedar sin su advertencia. En pantalla angosta, la bajada
+   explicativa del tablero baja debajo de la rejilla y la tarjeta se ordena así:
+   nombre, lugar, cifra, cuándo, estado del dato y acceso; el acumulado de 24 h
+   queda después y se lee al desplazarse. Medido con scrollY=0: los dos estados
+   de la primera tarjeta quedan dentro de 360×640 y de 360×800. No se achica
+   ninguna letra: solo se mueve el orden y se ajusta el aire. */
+@media (max-width: 560px) {
+  #tablero { margin-top: var(--e-2); }
+
+  /* El contenedor se vuelve una columna para poder mover la bajada. */
+  #tablero .contenido {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #tablero .tablero__cabeza { display: contents; }
+  #tablero .tablero__titulo { order: 1; }
+  #tablero .tablero__cuenta { order: 2; }
+  #tablero .tablero__rejilla { order: 3; margin-top: var(--e-2); }
+
+  /* La explicación de los puntos propuestos ya no empuja la primera tarjeta:
+     se lee debajo de la rejilla, con un filete que la separa. */
+  #tablero .tablero__bajada {
+    order: 5;
+    margin-top: var(--e-4);
+    padding-top: var(--e-3);
+    border-top: 1px solid var(--linea);
+  }
+
+  /* Un error de archivo se lee antes que la explicación de los propuestos. */
+  #tablero .estado,
+  #tablero noscript { order: 4; }
+
+  /* La tarjeta, más compacta, con los estados antes del acumulado. */
+  #tablero .estacion { padding: var(--e-3); }
+
+  #tablero .estacion__rotulo {
+    margin-top: var(--e-2);
+    padding-top: var(--e-1);
+  }
+
+  #tablero .estacion__estados {
+    order: 6;
+    gap: var(--e-1);
+    margin-top: var(--e-2);
+    padding-top: var(--e-2);
+  }
+
+  #tablero .estacion__acumulado { order: 7; }
+  #tablero .estacion__nota { order: 8; }
 }

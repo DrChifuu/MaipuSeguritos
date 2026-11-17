@@ -57,6 +57,17 @@
     return dd + '-' + mm + ' ' + hora(iso);
   }
 
+  /* "14-11": el día y el mes, con guion como el resto de la página. */
+  function diaMes(iso) {
+    var partes = fmtDiaMes.formatToParts(new Date(iso));
+    var dd = '', mm = '';
+    for (var i = 0; i < partes.length; i++) {
+      if (partes[i].type === 'day') dd = partes[i].value;
+      if (partes[i].type === 'month') mm = partes[i].value;
+    }
+    return dd + '-' + mm;
+  }
+
   /* La hora de medir y la hora de publicar son distintas y se muestran las dos.
      Una publicación de otro día lleva su fecha; la misma noche, solo la hora. */
   function publicado(medidoIso, publicadoIso) {
@@ -119,6 +130,23 @@
     simulado: 'datos simulados',
     real: 'dato real',
     historico: 'dato histórico'
+  };
+
+  /* Los tres estados del dato que declara el modelo multiestación
+     (panel-web/estaciones.md §2.1 y §10). La palabra es la del dominio; no se
+     inventa un sinónimo que asuste. */
+  var ESTADOS_DATO = {
+    al_dia: 'Dato al día',
+    atrasado: 'Dato atrasado',
+    sin_datos: 'Sin datos'
+  };
+
+  /* Los tres estados del acceso al lugar (§9 del sistema visual). Solo abierto
+     y restringido se muestran como informados: exigen fuente y hora. */
+  var ESTADOS_ACCESO = {
+    abierto: 'Acceso abierto',
+    restringido: 'Acceso restringido',
+    sin_informacion: 'Acceso sin información'
   };
 
   var DESFASE = /(Z|[+-]\d{2}:?\d{2})$/;
@@ -207,6 +235,55 @@
     return { registros: validos, rechazos: rechazos, meta: bruto };
   }
 
+  /* ----------------------------------------------- contrato multiestación */
+
+  /* `window.ESTACIONES` es el arreglo que escribe el generador desde
+     datos/puntos.py (panel-web/estaciones.md §2). Cada entrada trae quince
+     claves; acá solo se comprueba lo mínimo para pintar una tarjeta sin
+     inventar: id y nombre. Una entrada que no pase se descarta y se informa;
+     no se completa a mano. */
+  function leerEstaciones() {
+    var bruto = window.ESTACIONES;
+    if (!bruto) {
+      return {
+        error: 'No existe window.ESTACIONES. El archivo datos/estaciones.js no llegó ' +
+          'o no se pudo leer.'
+      };
+    }
+    if (!Array.isArray(bruto)) {
+      return {
+        error: 'window.ESTACIONES no es un arreglo: el archivo no tiene la forma que ' +
+          'describe panel-web/estaciones.md §2.'
+      };
+    }
+    var lista = [];
+    var rechazos = [];
+    for (var i = 0; i < bruto.length; i++) {
+      var e = bruto[i];
+      if (!e || typeof e !== 'object' || Array.isArray(e)) {
+        rechazos.push('entrada ' + (i + 1) + ': no es un objeto');
+        continue;
+      }
+      if (!esTexto(e.id)) {
+        rechazos.push('entrada ' + (i + 1) + ': sin id');
+        continue;
+      }
+      if (!esTexto(e.nombre)) {
+        rechazos.push('entrada ' + (i + 1) + ' (' + e.id + '): sin nombre');
+        continue;
+      }
+      lista.push(e);
+    }
+    if (!lista.length) {
+      return {
+        error: 'window.ESTACIONES no trae ninguna entrada que se pueda mostrar: cada ' +
+          'punto necesita al menos id y nombre.',
+        rechazos: rechazos
+      };
+    }
+    return { lista: lista, rechazos: rechazos };
+  }
+
   /* ------------------------------------------------------------ helpers */
 
   function porId(id) { return document.getElementById(id); }
@@ -254,9 +331,416 @@
     n.appendChild(ausente(nota));
   }
 
+  /* -------------------------------------------------- tablero multiestación */
+
+  /* Dónde es el punto: la quebrada si un documento la nombra; si no, el sector
+     tal como lo declara el archivo. La altura va solo si está declarada: nunca
+     se copia de otra parte (panel-web/estaciones.md §5). */
+  function lugarTexto(est) {
+    var partes = [];
+    if (esTexto(est.quebrada)) {
+      partes.push('Quebrada ' + est.quebrada);
+    } else if (esTexto(est.sector)) {
+      var sector = est.sector;
+      /* El sector de un punto puede empezar con la comuna; la tarjeta ya está
+         en el Cajón del Maipo y esa repetición le quita dos renglones. Se
+         conserva el texto declarado tal cual después de la coma. */
+      var corte = sector.indexOf(', sector ');
+      if (corte > 0) {
+        sector = sector.slice(corte + 2);
+        sector = sector.charAt(0).toUpperCase() + sector.slice(1);
+      }
+      /* El archivo ya escribe «sector» en algunos puntos; no se repite. */
+      partes.push(/sector/i.test(sector) ? sector : 'Sector ' + sector);
+    }
+    if (esNumero(est.elevacion_m)) partes.push(entero(est.elevacion_m) + ' m');
+    return partes.join(' · ');
+  }
+
+  /* En la tarjeta el nombre es el del lugar. «Estación Plaza de Armas» se
+     muestra «Plaza de Armas»; el nombre completo queda en el detalle y en el
+     selector, que es donde alguien lo busca. */
+  function nombreTarjeta(est) {
+    var nombre = est.nombre;
+    if (/^Estación\s+/i.test(nombre) && nombre.replace(/^Estación\s+/i, '').length > 2) {
+      return nombre.replace(/^Estación\s+/i, '');
+    }
+    return nombre;
+  }
+
+  /* Solo los tres estados del dominio. Un valor fuera del dominio no se
+     muestra como si fuera una medición: se dice «sin datos». */
+  function estadoDatoDe(est) {
+    var valor = est && typeof est.estado_dato === 'string' ? est.estado_dato : '';
+    if (valor === 'al_dia' || valor === 'al-dia') return 'al_dia';
+    if (valor === 'atrasado' || valor === 'retrasado') return 'atrasado';
+    return 'sin_datos';
+  }
+
+  function notaEstadoDato(est, estado) {
+    var propuesto = !!(est.procedencia && est.procedencia.propuesto === true);
+    if (estado === 'al_dia') {
+      var edad = hace(est.referencia_dato);
+      return /^hace /.test(edad) ? 'La referencia del dato es de ' + edad + '.' : null;
+    }
+    if (estado === 'atrasado') {
+      var edadAtraso = hace(est.referencia_dato);
+      return /^hace /.test(edadAtraso)
+        ? 'El dato es de ' + edadAtraso + ': no describe la lluvia de ahora.'
+        : 'La fecha del dato no se puede leer en el archivo.';
+    }
+    if (propuesto) return null;
+    return 'No hay lecturas publicadas de este punto.';
+  }
+
+  function crearEstadoDato(est, conNota) {
+    var estado = estadoDatoDe(est);
+    var p = nodo('p', 'estado-dato');
+    p.setAttribute('data-estado', estado);
+    var marca = nodo('span', 'estado-dato__marca');
+    marca.setAttribute('aria-hidden', 'true');
+    p.appendChild(marca);
+    p.appendChild(nodo('span', 'estado-dato__texto', ESTADOS_DATO[estado]));
+    var nota = conNota === false ? null : notaEstadoDato(est, estado);
+    if (nota) p.appendChild(nodo('span', 'estado-dato__nota', nota));
+    return p;
+  }
+
+  /* El acceso informado exige fuente y hora. Si falta una de las dos, el
+     estado ES «sin información»: media fuente no autoriza a decir cómo está el
+     camino (panel-web/estaciones.md §4.2). */
+  function accesoDe(acceso) {
+    var bloque = (acceso && typeof acceso === 'object' && !Array.isArray(acceso)) ? acceso : {};
+    var valor = typeof bloque.estado === 'string' ? bloque.estado.trim().toLowerCase() : '';
+    if (valor === 'sin-informacion') valor = 'sin_informacion';
+    var fuente = esTexto(bloque.fuente) ? bloque.fuente : null;
+    var instante = instanteValido(bloque.actualizado);
+    var nota = esTexto(bloque.nota) ? bloque.nota : null;
+    var informado = (valor === 'abierto' || valor === 'restringido') &&
+      fuente !== null && instante !== null;
+    if (informado) {
+      var edad = hace(bloque.actualizado);
+      var cola = /^hace /.test(edad) ? ' (' + edad + ')' : '';
+      return {
+        valor: valor,
+        palabra: ESTADOS_ACCESO[valor],
+        fuente: 'Fuente: ' + fuente.replace(/\.$/, '') + '. Actualizado el ' +
+          diaMes(bloque.actualizado) + ' a las ' + hora(bloque.actualizado) + cola + '.',
+        nota: nota
+      };
+    }
+    var declaraSinFuente = (valor === 'abierto' || valor === 'restringido');
+    var fuenteSinInformar;
+    if (declaraSinFuente) {
+      fuenteSinInformar = 'El archivo declara el estado, pero no trae fuente y hora: ' +
+        'sin las dos no se muestra como informado.';
+    } else if (fuente !== null || instante !== null) {
+      fuenteSinInformar = 'El archivo trae datos sueltos, pero no un estado de acceso ' +
+        'informado: no se puede afirmar cómo está el camino.';
+    } else {
+      fuenteSinInformar = 'Nadie ha informado cómo está el camino.';
+    }
+    return {
+      valor: 'sin_informacion',
+      palabra: ESTADOS_ACCESO.sin_informacion,
+      fuente: fuenteSinInformar,
+      nota: null
+    };
+  }
+
+  function crearAcceso(acceso, incluirNota) {
+    var leido = accesoDe(acceso);
+    var p = nodo('p', 'acceso');
+    p.setAttribute('data-acceso', leido.valor);
+    var marca = nodo('span', 'acceso__marca');
+    marca.setAttribute('aria-hidden', 'true');
+    p.appendChild(marca);
+    p.appendChild(nodo('span', 'acceso__texto', leido.palabra));
+    var fuente = leido.fuente;
+    if (incluirNota && leido.nota) {
+      var nota = leido.nota.trim();
+      if (!/[.!?]$/.test(nota)) nota += '.';
+      fuente += ' ' + nota;
+    }
+    p.appendChild(nodo('span', 'acceso__fuente', fuente));
+    return p;
+  }
+
+  /* La condición declarada por el archivo, sin depender del detalle: el
+     tablero se pinta antes de que el registro esté armado. */
+  function esSimuladoArchivo() {
+    if (datos.error || !datos.meta) return false;
+    return datos.meta && typeof datos.meta.label === 'string' &&
+      /simulad|ficticia/i.test(datos.meta.label);
+  }
+
+  /* La última publicación del archivo, o la referencia de los puntos si el
+     archivo no la declara. No se inventa una fecha. */
+  function publicadoTablero() {
+    if (datos.error || !datos.meta) return null;
+    var ms = instanteValido(datos.meta.published_at);
+    if (ms === null) {
+      for (var i = 0; i < estaciones.length; i++) {
+        var referencia = instanteValido(estaciones[i].referencia_dato);
+        if (referencia !== null && (ms === null || referencia > ms)) ms = referencia;
+      }
+    }
+    return ms === null ? null : cuando(new Date(ms).toISOString());
+  }
+
+  /* Una tarjeta por punto, en el orden del archivo. Nada se recalcula acá:
+     el estado del dato y el acumulado salen del archivo; la última lectura
+     sale de las mediciones publicadas. */
+  function crearTarjeta(est, indice) {
+    var estado = estadoDatoDe(est);
+    var propuesto = !!(est.procedencia && est.procedencia.propuesto === true);
+    var tarjeta = nodo('article', 'estacion');
+    tarjeta.setAttribute('data-estado', estado);
+    tarjeta.setAttribute('role', 'listitem');
+    var idNombre = 'tab-estacion-' + indice + '-nombre';
+    tarjeta.setAttribute('aria-labelledby', idNombre);
+
+    var nombre = nodo('h2', 'estacion__nombre', nombreTarjeta(est));
+    nombre.id = idNombre;
+    tarjeta.appendChild(nombre);
+
+    var lugar = lugarTexto(est);
+    if (lugar) tarjeta.appendChild(nodo('p', 'estacion__lugar', lugar));
+
+    if (propuesto) tarjeta.appendChild(nodo('p', 'estacion__propuesto', 'Punto propuesto'));
+
+    tarjeta.appendChild(nodo('p', 'estacion__rotulo', 'Última lectura'));
+
+    var ultima = ultimaAutoPorPunto[est.id] || null;
+    var conLecturas = esNumero(est.lecturas) && est.lecturas > 0;
+    var hayCifra = conLecturas && estado !== 'sin_datos' && ultima !== null;
+    var valor = nodo('p', 'estacion__valor');
+    if (hayCifra) {
+      valor.className = 'estacion__valor cifra';
+      valor.appendChild(document.createTextNode(uno(ultima.rainfall_mm) + ' '));
+      valor.appendChild(nodo('span', 'estacion__unidad', 'mm'));
+    } else if (estado === 'sin_datos') {
+      valor.textContent = 'Sin datos';
+    } else {
+      /* El punto declara lecturas pero el archivo no las trae: se dice, no se
+         rellena con cero ni se grita una palabra al tamaño de la cifra. */
+      valor.className = 'estacion__valor estacion__valor--texto';
+      valor.textContent = 'No disponible';
+    }
+    tarjeta.appendChild(valor);
+
+    var cuandoTxt;
+    if (hayCifra) {
+      var edad = hace(ultima.timestamp);
+      cuandoTxt = 'Midió el ' + diaMes(ultima.timestamp) + ' a las ' +
+        hora(ultima.timestamp) + (/^hace /.test(edad) ? ' (' + edad + ')' : '') + '.';
+    } else if (estado === 'sin_datos') {
+      cuandoTxt = 'Este punto todavía no tiene lecturas.';
+    } else {
+      cuandoTxt = 'La última lectura no se pudo leer en el archivo.';
+    }
+    tarjeta.appendChild(nodo('p', 'estacion__cuando', cuandoTxt));
+
+    var acumulado = nodo('p', 'estacion__acumulado');
+    acumulado.appendChild(nodo('span', 'estacion__acumulado-rotulo', 'En 24 h'));
+    var acumuladoValor = nodo('span', 'estacion__acumulado-valor');
+    if (esNumero(est.acumulado_24h_mm)) {
+      acumuladoValor.textContent = uno(est.acumulado_24h_mm) + ' mm';
+    } else {
+      acumuladoValor.textContent = 'Sin datos';
+    }
+    acumulado.appendChild(acumuladoValor);
+    tarjeta.appendChild(acumulado);
+
+    /* El período del acumulado, con su salvedad: la ventana de 24 h se informa
+       con lo que la serie cubre, no con lo que se querría que cubriera. */
+    if (esNumero(est.acumulado_24h_mm)) {
+      var desde = instanteValido(est.acumulado_24h_desde);
+      var hasta = instanteValido(est.acumulado_24h_hasta);
+      if (desde !== null && hasta !== null && hasta > desde) {
+        var horas = (hasta - desde) / HORA_MS;
+        var periodo = 'Del ' + diaMes(est.acumulado_24h_desde) + ' ' +
+          hora(est.acumulado_24h_desde) + ' al ' + diaMes(est.acumulado_24h_hasta) +
+          ' ' + hora(est.acumulado_24h_hasta) + ' (' + duracion(horas) +
+          (horas < 23.99 ? ', no 24 h' : '') + ').';
+        tarjeta.appendChild(nodo('p', 'estacion__nota', periodo));
+      } else {
+        tarjeta.appendChild(nodo('p', 'estacion__nota',
+          'El período del acumulado no está declarado en el archivo.'));
+      }
+    }
+
+    var estados = nodo('div', 'estacion__estados');
+    estados.appendChild(crearEstadoDato(est, false));
+    estados.appendChild(crearAcceso(est.acceso, false));
+    tarjeta.appendChild(estados);
+
+    return tarjeta;
+  }
+
+  function pintarTablero() {
+    var rejilla = porId('tablero-rejilla');
+    var cuenta = porId('tablero-cuenta');
+    var cajaError = porId('tablero-error');
+    var motivo = porId('tablero-error-motivo');
+    if (!rejilla) return;
+    limpiar(rejilla);
+    if (cuenta) limpiar(cuenta);
+    if (estacionesDatos.error) {
+      if (cajaError) cajaError.hidden = false;
+      if (motivo) motivo.textContent = estacionesDatos.error;
+      if (cuenta) cuenta.textContent = 'No se pudo leer el archivo de puntos.';
+      return;
+    }
+    if (cajaError) cajaError.hidden = true;
+    for (var i = 0; i < estaciones.length; i++) {
+      rejilla.appendChild(crearTarjeta(estaciones[i], i));
+    }
+    if (cuenta) {
+      var partes = [estaciones.length + (estaciones.length === 1 ? ' punto' : ' puntos')];
+      var publicacion = publicadoTablero();
+      partes.push(publicacion
+        ? 'última publicación ' + publicacion
+        : 'la fecha de publicación no está disponible');
+      if (esSimuladoArchivo()) partes.push('datos simulados para prueba');
+      if (estacionesDatos.rechazos && estacionesDatos.rechazos.length) {
+        partes.push(estacionesDatos.rechazos.length + ' entrada(s) descartada(s)');
+      }
+      cuenta.appendChild(document.createTextNode(partes.join(' · ') + ' · '));
+      var enlace = nodo('a', null, 'Cómo leer este tablero');
+      enlace.href = '#como-leer';
+      cuenta.appendChild(enlace);
+    }
+  }
+
+  /* El detalle del punto seleccionado: botones con el nombre de cada punto.
+     La tarjeta no es un botón; el detalle se elige acá, con un control que se
+     alcanza con el teclado. */
+  function prepararSelector() {
+    var caja = porId('detalle-selector');
+    var rotulo = porId('detalle-selector-rotulo');
+    if (!caja) return;
+    limpiar(caja);
+    if (estacionesDatos.error || !estaciones.length) {
+      /* Sin puntos no hay nada que elegir: se retira el control, no se deja
+         un grupo vacío con un rótulo que no lleva a ninguna parte. */
+      caja.hidden = true;
+      if (rotulo) rotulo.hidden = true;
+      return;
+    }
+    estaciones.forEach(function (est) {
+      var boton = nodo('button', 'boton boton--suave', est.nombre);
+      boton.type = 'button';
+      boton.setAttribute('data-estacion', est.id);
+      boton.setAttribute('aria-pressed', 'false');
+      boton.setAttribute('aria-controls', 'detalle-cifras detalle-vacio');
+      boton.addEventListener('click', function () { seleccionarEstacion(est.id); });
+      caja.appendChild(boton);
+    });
+    var inicial = estaciones[0].id;
+    for (var i = 0; i < estaciones.length; i++) {
+      if (esNumero(estaciones[i].lecturas) && estaciones[i].lecturas > 0) {
+        inicial = estaciones[i].id;
+        break;
+      }
+    }
+    seleccionarEstacion(inicial);
+  }
+
+  function seleccionarEstacion(id) {
+    var est = estacionesPorId[id];
+    if (!est) return;
+    seleccionId = id;
+    var botones = document.querySelectorAll('#detalle-selector [data-estacion]');
+    Array.prototype.forEach.call(botones, function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-estacion') === id ? 'true' : 'false');
+    });
+    var lugar = lugarTexto(est);
+    texto('estacion-detalle', est.nombre + (lugar ? ' · ' + lugar : ''));
+    texto('detalle-viendo', 'Viendo el detalle de ' + est.nombre + '.');
+    pintarDetalleEstados(est);
+    aplicarSeleccion();
+  }
+
+  function pintarDetalleEstados(est) {
+    var caja = porId('detalle-estados');
+    if (!caja) return;
+    limpiar(caja);
+    caja.appendChild(crearEstadoDato(est, true));
+    caja.appendChild(crearAcceso(est.acceso, true));
+  }
+
+  /* El detalle del registro —gráfico, cifras, tabla y descargas— es el del
+     punto que tiene lecturas en el archivo. Si se elige un punto sin lecturas,
+     no se reetiquetan las cifras de otro: se ocultan y se explica el vacío. */
+  function aplicarSeleccion() {
+    if (!detalleListo) return;
+    var est = estacionesPorId[seleccionId];
+    if (!est) return;
+    var archivoOk = !datos.error;
+    var conLecturas = esNumero(est.lecturas) && est.lecturas > 0;
+    var hayRegistros = archivoOk && registros.length > 0;
+    var mostrarRegistro = archivoOk && conLecturas && hayRegistros;
+    var cajaCifras = porId('detalle-cifras');
+    var cajaPanel = porId('panel-datos');
+    var cajaVacio = porId('detalle-vacio');
+    if (cajaCifras) cajaCifras.hidden = !mostrarRegistro;
+    if (cajaPanel) cajaPanel.hidden = !mostrarRegistro;
+    /* Al volver a un punto con lecturas, el gráfico se redibuja con el ancho
+       actual: pudo cambiar el tamaño de la ventana mientras estaba oculto, y
+       un SVG escalado dejaría los rótulos fuera del piso de 16 px. */
+    if (mostrarRegistro && auto.length) dibujar();
+    if (!cajaVacio) return;
+    /* El vacío del punto solo se explica cuando el archivo sí trae registros.
+       Si el archivo está vacío, el bloque del registro ya lo dice: no se
+       suman dos mensajes para el mismo hueco. */
+    cajaVacio.hidden = !(archivoOk && !conLecturas && hayRegistros);
+    if (cajaVacio.hidden) return;
+    var titulo = porId('detalle-vacio-titulo');
+    var cuerpo = porId('detalle-vacio-texto');
+    if (titulo) titulo.textContent = 'Este punto no tiene lecturas';
+    if (cuerpo) {
+      var propuesto = !!(est.procedencia && est.procedencia.propuesto === true);
+      cuerpo.textContent = (propuesto ? 'Es un punto propuesto: ' : '') +
+        'no hay sensor instalado ni lecturas registradas. Por eso no hay última lluvia, ' +
+        'acumulado, gráfico ni tabla que mostrar, y nada se rellena con cero.';
+    }
+  }
+
   /* --------------------------------------------------------------- datos */
 
   var datos = leerDatos();
+  var estacionesDatos = leerEstaciones();
+  var estaciones = estacionesDatos.lista || [];
+  var estacionesPorId = {};
+  var ultimaAutoPorPunto = {};
+  var seleccionId = estaciones.length ? estaciones[0].id : null;
+  /* El detalle se arma después; hasta entonces una selección no puede tocar
+     los bloques del registro, que todavía no existen. */
+  var detalleListo = false;
+
+  for (var ie = 0; ie < estaciones.length; ie++) {
+    estacionesPorId[estaciones[ie].id] = estaciones[ie];
+  }
+
+  /* La última lectura de cada punto sale de las mediciones publicadas; acá no
+     se calcula ninguna cifra nueva. Una lectura manual no es la última lectura
+     del sensor. */
+  if (!datos.error && Array.isArray(datos.registros)) {
+    for (var im = 0; im < datos.registros.length; im++) {
+      var medicion = datos.registros[im];
+      if (medicion.source !== 'automatico') continue;
+      var anterior = ultimaAutoPorPunto[medicion.station_id];
+      if (!anterior || msDe(medicion.timestamp) > msDe(anterior.timestamp)) {
+        ultimaAutoPorPunto[medicion.station_id] = medicion;
+      }
+    }
+  }
+
+  /* El tablero se pinta antes de saber si el registro llegó: la primera
+     pantalla no depende de un archivo que puede faltar. */
+  pintarTablero();
+  prepararSelector();
 
   if (datos.error) {
     /* Sin archivo de datos, el resto de la página sigue funcionando: la serie
@@ -429,6 +913,8 @@
   function fallar(motivo) {
     ocultar('estado-carga');
     ocultar('panel-datos');
+    ocultar('detalle-cifras');
+    ocultar('detalle-vacio');
     ocultar('estado-vacio');
     ocultar('estado-sin-sensor');
     ocultar('estado-rechazos');
@@ -829,14 +1315,24 @@
       'el acumulado del tramo, que se reinicia en cada vaciado del tubo.' +
       (cortes.length
         ? ' Hay ' + cortes.length + ' ' + plural(cortes.length, 'vaciado marcado', 'vaciados marcados') + '.'
+        : '') +
+      (manuales.length
+        ? ' Incluye ' + manuales.length + ' ' +
+          plural(manuales.length, 'lectura manual marcada', 'lecturas manuales marcadas') + '.'
         : ''));
 
+    /* Los rótulos del gráfico se dibujan a 16 px, el piso del sistema. Por eso
+       los márgenes son más anchos que en la versión de 11 px: el eje izquierdo
+       necesita la columna de las cifras y el derecho, la del acumulado. Los
+       títulos de los ejes no van dentro del SVG: están en el pie de la figura,
+       donde se leen a 16 px y no se cortan ni se cruzan. */
     var W = Math.max(300, Math.round(lienzo.clientWidth || 900));
     var angosto = W < 620;
-    var alto = angosto ? 300 : 320;
-    var m = { t: angosto ? 26 : 34, r: angosto ? 40 : 84, b: 38, l: angosto ? 34 : 48 };
+    var alto = angosto ? 320 : 340;
+    var m = { t: angosto ? 28 : 34, r: angosto ? 52 : 64, b: 48, l: angosto ? 52 : 56 };
     var pw = W - m.l - m.r;
     var ph = alto - m.t - m.b;
+    var TAM_ROTULO = 16;
 
     var maxBarraDato = 0;
     for (var i = 0; i < auto.length; i++) {
@@ -874,8 +1370,8 @@
         stroke: 'rgba(231,239,241,0.13)', 'stroke-width': 1
       }));
       var et = svgEl('text', {
-        x: m.l - 10, y: y + 4, 'text-anchor': 'end',
-        fill: '#9db4bb', 'font-size': 11
+        x: m.l - 10, y: y + 5, 'text-anchor': 'end',
+        fill: '#aec3c9', 'font-size': TAM_ROTULO
       });
       et.textContent = uno(valor);
       svg.appendChild(et);
@@ -885,8 +1381,8 @@
     for (var v = 0; v <= maxAcum; v += pasoAcum) {
       var ya = yAcum(v);
       var ta = svgEl('text', {
-        x: m.l + pw + 10, y: ya + 4, 'text-anchor': 'start',
-        fill: '#6fc3cf', 'font-size': 11
+        x: m.l + pw + 10, y: ya + 5, 'text-anchor': 'start',
+        fill: '#6fc3cf', 'font-size': TAM_ROTULO
       });
       ta.textContent = fmtNum0.format(v);
       svg.appendChild(ta);
@@ -924,23 +1420,21 @@
       'stroke-linecap': 'round'
     }));
 
-    /* cada vaciado, no solo el primero */
+    /* cada vaciado, no solo el primero. La marca queda en el dibujo; el hecho
+       se escribe en el pie de la figura, donde se lee a 16 px sin cruzarse. */
     for (var c = 0; c < cortes.length; c++) {
       var indiceCorte = auto.indexOf(cortes[c].fila);
       if (indiceCorte < 0) continue;
       var xc = x(indiceCorte);
-      svg.appendChild(svgEl('line', {
+      var lineaCorte = svgEl('line', {
         x1: xc, y1: m.t, x2: xc, y2: m.t + ph,
         stroke: '#f0c169', 'stroke-width': 1, 'stroke-dasharray': '3 4'
-      }));
-      var tc = svgEl('text', {
-        x: Math.min(xc + 7, m.l + pw - 4),
-        y: m.t + (c % 2 ? 26 : 12),
-        'text-anchor': xc + 7 > m.l + pw - 4 ? 'end' : 'start',
-        fill: '#f0c169', 'font-size': 11
       });
-      tc.textContent = 'vaciado ' + hora(cortes[c].fila.timestamp);
-      svg.appendChild(tc);
+      var tituloCorte = svgEl('title', {});
+      tituloCorte.textContent = 'Vaciado del tubo a las ' +
+        hora(cortes[c].fila.timestamp) + '.';
+      lineaCorte.appendChild(tituloCorte);
+      svg.appendChild(lineaCorte);
     }
 
     /* lectura manual sobre el eje del acumulado */
@@ -955,27 +1449,25 @@
         x1: posX, y1: yAcum(lecturaManual.rainfall_mm), x2: posX, y2: m.t + ph,
         stroke: 'rgba(240,193,105,0.35)', 'stroke-width': 1
       }));
-      svg.appendChild(svgEl('circle', {
+      var puntoManual = svgEl('circle', {
         cx: posX, cy: yAcum(lecturaManual.rainfall_mm), r: 5,
         fill: '#0f242c', stroke: '#f0c169', 'stroke-width': 2
-      }));
-      var haciaIzquierda = posX > m.l + pw * 0.62;
-      var tm = svgEl('text', {
-        x: haciaIzquierda ? posX - 10 : posX + 10,
-        y: yAcum(lecturaManual.rainfall_mm) - 10,
-        'text-anchor': haciaIzquierda ? 'end' : 'start',
-        fill: '#f0c169', 'font-size': 11
       });
-      tm.textContent = 'manual ' + uno(lecturaManual.rainfall_mm) + ' mm';
-      svg.appendChild(tm);
+      var tituloManual = svgEl('title', {});
+      tituloManual.textContent = 'Lectura manual de ' + uno(lecturaManual.rainfall_mm) +
+        ' mm a las ' + hora(lecturaManual.timestamp) + '.';
+      puntoManual.appendChild(tituloManual);
+      svg.appendChild(puntoManual);
     });
 
-    /* eje de tiempo */
+    /* eje de tiempo: la cantidad de marcas se adapta al ancho para que los
+       rótulos de 16 px no queden encimados en la pantalla angosta. */
+    var cada = Math.max(1, Math.ceil(84 / paso));
     for (var q = 0; q < auto.length; q++) {
-      if (q % (angosto ? 10 : 6) !== 0) continue;
+      if (q % cada !== 0) continue;
       var tt = svgEl('text', {
-        x: x(q), y: m.t + ph + 22, 'text-anchor': 'middle',
-        fill: '#9db4bb', 'font-size': 11
+        x: x(q), y: m.t + ph + 24, 'text-anchor': 'middle',
+        fill: '#aec3c9', 'font-size': TAM_ROTULO
       });
       tt.textContent = hora(auto[q].timestamp);
       svg.appendChild(tt);
@@ -985,20 +1477,33 @@
       }));
     }
 
-    /* títulos de los dos ejes */
-    if (!angosto) {
-      var titulo1 = svgEl('text', { x: m.l, y: m.t - 12, fill: '#9db4bb', 'font-size': 11 });
-      titulo1.textContent = 'mm por registro';
-      svg.appendChild(titulo1);
-
-      var titulo2 = svgEl('text', {
-        x: m.l + pw + 10, y: m.t - 12, fill: '#6fc3cf', 'font-size': 11
-      });
-      titulo2.textContent = 'acumulado del tramo';
-      svg.appendChild(titulo2);
-    }
+    /* Los hechos del gráfico —vaciados y lecturas manuales— se escriben en el
+       pie de la figura, no encima de las barras: a 16 px se cruzaban. */
+    pintarEventosGrafico();
 
     lienzo.appendChild(svg);
+  }
+
+  /* El pie del gráfico: qué marcas tiene y a qué hora. Es texto visible, no
+     información escondida en el puntero. */
+  function pintarEventosGrafico() {
+    var caja = porId('grafico-eventos');
+    if (!caja) return;
+    limpiar(caja);
+    var partes = [];
+    for (var i = 0; i < cortes.length; i++) {
+      partes.push('Vaciado del tubo a las ' + hora(cortes[i].fila.timestamp) + '.');
+    }
+    for (var j = 0; j < manuales.length; j++) {
+      partes.push('Lectura manual de ' + uno(manuales[j].rainfall_mm) + ' mm a las ' +
+        hora(manuales[j].timestamp) + '.');
+    }
+    if (!partes.length) {
+      caja.hidden = true;
+      return;
+    }
+    caja.hidden = false;
+    caja.textContent = partes.join(' ');
   }
 
   /* ---------------------------------------------------------------- tabla */
@@ -1401,6 +1906,13 @@
           'intensidad ni gráfico, y no se pone un cero en su lugar.');
       mostrar('estado-vacio');
       if (rechazos.length) mostrarRechazos();
+      /* El detalle queda listo aunque no haya registro: el selector y el
+         estado de acceso de cada punto siguen funcionando. */
+      detalleListo = true;
+      if (seleccionId) seleccionarEstacion(seleccionId);
+      pintarHistoricos();
+      regla();
+      modo();
       return;
     }
 
@@ -1443,6 +1955,12 @@
     pintarHistoricos();
     regla();
     modo();
+
+    /* Con el registro armado, el detalle ya puede seguir a la selección del
+       tablero. Si el punto elegido no tiene lecturas, no se reetiquetan las de
+       otro: se ocultan y se explica el vacío. */
+    detalleListo = true;
+    if (seleccionId) seleccionarEstacion(seleccionId);
 
     var redibujar;
     var lienzo = porId('lienzo');
