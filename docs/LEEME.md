@@ -1,11 +1,12 @@
 # Panel Maipo Vigía — cómo se abre, se publica y se actualiza
 
-**Qué es.** Una página estática que muestra el estado del proyecto y el registro de lluvia
-en una vista de consulta. Responde a las observaciones 4 y 5 de la profesora: *dónde se
-consulta la información* y *cómo se incorporan los datos históricos*.
+**Qué es.** El panel de datos del pluviómetro comunitario del Cajón del Maipo: la última
+lectura de lluvia al frente, el acumulado de 24 h, el estado del dato, el registro completo
+con gráfico y tabla, la serie histórica y las descargas CSV y JSON.
 
-**Qué no es.** No hay servidor, no hay base de datos, no hay formulario en línea y no está
-conectada a ninguna estación. Todo lo que se ve son **datos simulados para prueba**.
+**Qué no es.** No hay servidor, no hay base de datos, no hay formulario en línea y no recibe
+mediciones en vivo: es una **copia estática** de la última publicación. Hay un solo punto
+propuesto y todavía no está instalado. Todo lo que se ve son **datos simulados para prueba**.
 
 ---
 
@@ -140,6 +141,15 @@ traducir nada:
   queda marcado en su fila y en el gráfico.
 - **La antigüedad va al lado de la fecha.** Una publicación de más de seis horas se marca
   como dato antiguo.
+- **El estado del dato se declara arriba.** El bloque de cabecera responde sin desplazarse:
+  última lectura del sensor, hace cuánto se registró, acumulado de 24 h con su advertencia de
+  ventana incompleta y estado (al día, atrasado o sin datos). La referencia es la última
+  publicación y, si el archivo no la declara, la última lectura.
+- **La ubicación del punto sale del archivo.** El sector, la comuna, la región y la altitud
+  se muestran tal como los declara `station`, con su carácter aproximado; la página nunca
+  escribe una dirección ni inventa un punto que no esté en los datos.
+- **La tabla se filtra por canal y por punto.** Los botones de canal usan los valores de
+  `source`; los de punto se generan con los `station_id` del archivo, uno por punto.
 
 ## 4. Reglas que no se rompen
 
@@ -147,14 +157,20 @@ traducir nada:
    «Datos simulados para prueba» va visible arriba del panel y dentro de cada archivo que se
    descarga.
 2. **Nada de datos personales.** Sin nombres, teléfonos, correos, RUT ni direcciones
-   exactas. Los puntos se identifican por sector aproximado. La atribución es por equipo,
-   programa y universidad.
+   exactas. Los puntos se identifican por su sector aproximado y su `station_id`, tal como
+   vienen en el archivo.
 3. **La hora de medir no es la hora de publicar.** Se muestran las dos.
 4. **Un vacío es un vacío.** No se rellena con cero.
 5. **Un total diario no se convierte en intensidad horaria.**
 6. **Ningún total se presenta como lo que no es.** El acumulado de 24 h, el total del
    archivo y la intensidad media son tres cuentas distintas y se dicen por su nombre.
 7. **El histórico vive aparte**, con su fuente y su permiso de uso.
+8. **La página no se presenta como un servicio en vivo.** Dice, arriba y en el pie, que es
+   una copia estática de la última publicación y muestra la hora de actualización. No usa
+   «tiempo real», «en vivo» ni «streaming» para describir lo que no lo es.
+9. **No hay narrativa de proyecto en la página.** No aparecen equipos, cursos, ferias ni
+   repositorios: el panel muestra el dato y lo que hace falta para leerlo. «Maipo Vigía» es
+   el nombre del instrumento.
 
 ## 5. Los cinco estados del dato
 
@@ -165,11 +181,19 @@ El sistema visual define cinco condiciones. En esta página se ven así:
 | Carga en curso | Bloque bajo el título del panel, con barra que avanza | Antes de que `app.js` arme el registro: está en el marcado, no se agrega después |
 | Error de carga | Bloque con marca tachada y borde óxido | El archivo de datos no llegó o no tiene la forma esperada |
 | Sin datos | Bloque bajo el título, y la celda «sin dato» de históricos | El archivo no trae registros, o un día de la serie no tiene total |
-| Dato antiguo | Marca en línea junto a la última publicación y a la fecha de publicación | La publicación declarada tiene más de seis horas |
+| Dato antiguo | Marca en línea junto a la última publicación, en la fecha de publicación y en el estado del bloque de arriba | La publicación declarada tiene más de seis horas |
 | Período incompleto | Bloque bajo las cifras | La serie no cubre la ventana de 24 h que se informa |
 
 El detalle de cada pieza está en `panel-web/diseno/sistema.md` §8; la muestra navegable,
 en `panel-web/diseno/muestra.html`.
+
+## 5.1 Cómo se lee la página
+
+Las secciones siguen el orden en que se necesita el dato: **Datos** (la última lectura, el
+acumulado de 24 h y el estado), **Registro** (ficha, gráfico, cifras, tabla y descargas),
+**Estado del dato** (cuándo se publicó y si está al día o atrasado), **Instrumento** (cómo
+mide y de qué depende la lectura), **Formato** (los campos del archivo) e **Históricos**
+(series anteriores, aparte).
 
 ## 6. Estructura
 
@@ -198,8 +222,14 @@ local):
   dejar el bloque de carga avanzando para siempre.
 - Las 41 filas de la tabla se generan desde el archivo de datos; el gráfico dibuja 40
   barras, la línea del acumulado y el vaciado del tubo.
-- El filtro por canal (todo, sensor, manual) cambia la tabla y anuncia cuántas filas quedan.
+- El filtro por canal (todo, sensor, manual) y el filtro por punto cambian la tabla y
+  anuncian cuántas filas quedan.
 - Las descargas CSV y JSON se generan, se abren y declaran que son simuladas.
+- El bloque de arriba muestra la última lectura, su antigüedad, el acumulado de 24 h con la
+  marca de ventana incompleta y el estado del dato; en 360, 390 y 1280 px se ve sin
+  desplazarse.
+- La ubicación del punto y el sector de la tabla salen de los metadatos del archivo, no de
+  texto escrito a mano.
 - El acumulado de 24 h, el total del archivo y la intensidad media salen de cuentas
   distintas y comprobables a mano sobre el archivo.
 - Los cinco estados se ven: se probaron con archivos de datos preparados para cada caso

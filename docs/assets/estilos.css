@@ -11,16 +11,14 @@
      04  foco y salto de contenido
      05  la regla (índice lateral con forma de tubo)
      06  cabecera
-     07  portada
-     08  panel
-     09  estados del dato
-     10  secciones
-     11  tablas
-     12  listas
-     13  código
-     14  pie
-     15  adaptaciones
-     16  impresión
+     07  panel
+     08  estados del dato
+     09  secciones
+     10  tablas y listas
+     11  código
+     12  pie
+     13  adaptaciones
+     14  impresión
 
    El sistema completo —dirección, tokens, escala, estados y clases— está
    documentado en panel-web/diseno/sistema.md.
@@ -370,70 +368,7 @@ code, pre { font-family: var(--mono); }
   text-align: right;
 }
 
-/* ------------------------------------------------------------- 07 portada */
-
-.portada { padding-block: clamp(3.5rem, 9vw, 7.5rem) var(--ritmo); }
-
-.portada h1 {
-  font-size: var(--t-3xl);
-  line-height: var(--ti-titular);
-  letter-spacing: -0.025em;
-}
-
-.portada__entrada {
-  margin-top: clamp(1.75rem, 3.4vw, 2.875rem);
-  max-width: 62ch;
-  font-size: var(--t-lg);
-  color: var(--tinta-2);
-  text-wrap: pretty;
-}
-.portada__entrada strong { color: var(--tinta); font-weight: 600; }
-
-.ficha-corta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin: clamp(2.25rem, 4.4vw, 3.75rem) 0 0;
-  border-top: 1px solid var(--tinta);
-}
-
-.ficha-corta > div {
-  padding: var(--e-4) var(--e-5) var(--e-4) 0;
-  border-right: 1px solid var(--linea);
-}
-.ficha-corta > div:last-child { border-right: 0; }
-
-.ficha-corta dt {
-  font-size: var(--t-2xs);
-  color: var(--tinta-3);
-  margin-bottom: var(--e-1);
-}
-
-.ficha-corta dd {
-  margin: 0;
-  font-family: var(--serif);
-  font-size: clamp(1.35rem, 2.1vw, 1.75rem);
-  line-height: 1.1;
-}
-.ficha-corta dd span {
-  display: block;
-  font-family: var(--sans);
-  font-size: var(--t-2xs);
-  color: var(--tinta-3);
-  margin-top: var(--e-1);
-  line-height: var(--ti-compacto);
-}
-
-.portada__aviso {
-  margin-top: clamp(2rem, 3.6vw, 3rem);
-  max-width: 62ch;
-  font-size: var(--t-sm);
-  color: var(--tinta-2);
-  border-left: 2px solid var(--ambar);
-  padding-left: var(--e-4);
-}
-
-/* --------------------------------------------------------------- 08 panel */
+/* --------------------------------------------------------------- 07 panel */
 
 .panel {
   background: var(--pantalla);
@@ -484,16 +419,6 @@ code, pre { font-family: var(--mono); }
   max-width: 52ch;
   line-height: var(--ti-compacto);
 }
-
-.panel__reloj {
-  text-align: right;
-  display: flex;
-  flex-direction: column;
-  gap: var(--e-1);
-}
-
-.panel__etiqueta { font-size: var(--t-2xs); color: var(--pantalla-suave); }
-.panel__reloj .cifra { font-size: var(--t-base); line-height: var(--ti-compacto); }
 
 .ficha-larga {
   display: grid;
@@ -634,7 +559,7 @@ code, pre { font-family: var(--mono); }
   line-height: var(--ti-compacto);
 }
 
-/* ------------------------------------------------------ 09 estados del dato */
+/* ------------------------------------------------------ 08 estados del dato */
 
 /* Cinco condiciones que el panel tiene que poder decir sin adornos: sin datos,
    dato antiguo, período incompleto, error de carga y carga en curso.
@@ -824,7 +749,7 @@ code, pre { font-family: var(--mono); }
   font-variant-numeric: tabular-nums;
 }
 
-/* ------------------------------------------------------------ 10 secciones */
+/* ------------------------------------------------------------ 09 secciones */
 
 .seccion {
   padding-block: var(--ritmo);
@@ -931,45 +856,7 @@ code, pre { font-family: var(--mono); }
   margin-top: var(--e-1);
 }
 
-/* flujo */
-
-.flujo {
-  margin: var(--e-5) 0 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: paso;
-  max-width: 74ch;
-  border-left: 1px solid var(--linea);
-}
-
-.flujo li {
-  position: relative;
-  padding: 0 0 var(--e-5) 30px;
-  counter-increment: paso;
-  font-size: var(--t-md);
-  color: var(--tinta-2);
-  line-height: var(--ti-texto);
-}
-
-.flujo li::before {
-  content: counter(paso);
-  position: absolute;
-  left: -12px;
-  top: 0;
-  width: 23px;
-  height: 23px;
-  display: grid;
-  place-items: center;
-  background: var(--papel);
-  border: 1px solid var(--agua);
-  color: var(--agua);
-  font-size: var(--t-2xs);
-  font-weight: 600;
-}
-
-.flujo strong { color: var(--tinta); font-weight: 600; }
-
-/* --------------------------------------------------------------- 11 tablas */
+/* --------------------------------------------------------------- 10 tablas */
 
 .tabla {
   width: 100%;
@@ -1027,19 +914,6 @@ code, pre { font-family: var(--mono); }
 .marca-fila { color: var(--ambar-claro); }
 .sin-revisar { color: var(--pantalla-suave); }
 
-.pildora {
-  display: inline-block;
-  font-size: var(--t-2xs);
-  font-weight: 600;
-  line-height: var(--ti-compacto);
-  padding: 2px 9px;
-  border: 1px solid currentColor;
-  color: var(--pigmento-aviso);
-  white-space: nowrap;
-}
-
-.pildora--hecho { color: var(--verde); }
-
 /* reglas de lectura */
 
 .reglas {
@@ -1088,54 +962,7 @@ code, pre { font-family: var(--mono); }
   line-height: var(--ti-texto);
 }
 
-/* bitácora */
-
-.linea {
-  margin: clamp(1.75rem, 3.4vw, 2.75rem) 0 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--tinta);
-  max-width: 78ch;
-}
-
-.linea li {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr);
-  gap: var(--e-1) var(--e-5);
-  padding-block: var(--e-4);
-  border-bottom: 1px solid var(--linea);
-  align-items: baseline;
-}
-
-.linea time {
-  font-size: var(--t-xs);
-  color: var(--tinta-3);
-  font-feature-settings: 'tnum' 1;
-}
-
-/* El título del enlace se subraya con un filete de 1 px: la misma clase de
-   marca que el resto de la página, y una señal que no depende del color. */
-.linea a {
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-decoration-color: var(--tinta-3);
-  text-underline-offset: 3px;
-  font-weight: 600;
-  font-size: var(--t-base);
-  justify-self: start;
-  transition: text-decoration-color 140ms ease;
-}
-.linea a:hover,
-.linea a:focus-visible { text-decoration-color: var(--agua); }
-
-.linea span {
-  grid-column: 2;
-  font-size: var(--t-sm);
-  color: var(--tinta-2);
-  line-height: var(--ti-texto);
-}
-
-/* --------------------------------------------------------------- 12 código */
+/* --------------------------------------------------------------- 11 código */
 
 .codigo {
   margin: var(--e-3) 0 0;
@@ -1150,7 +977,7 @@ code, pre { font-family: var(--mono); }
   tab-size: 2;
 }
 
-/* ------------------------------------------------------------------ 13 pie */
+/* ------------------------------------------------------------------ 12 pie */
 
 .pie {
   border-top: 1px solid var(--tinta);
@@ -1219,7 +1046,7 @@ code, pre { font-family: var(--mono); }
   line-height: var(--ti-texto);
 }
 
-/* --------------------------------------------------------- 14 adaptaciones */
+/* --------------------------------------------------------- 13 adaptaciones */
 
 /* 1280 y más: la regla lateral ocupa su carril y el contenido se centra en
    el resto. Bajo 1180 el carril no cabe y el índice se retira: las siete
@@ -1255,12 +1082,6 @@ code, pre { font-family: var(--mono); }
 @media (max-width: 720px) {
   body { font-size: 1rem; }
   .cabecera__curso { display: none; }
-  .ficha-corta { grid-template-columns: 1fr; }
-  .ficha-corta > div {
-    border-right: 0;
-    border-bottom: 1px solid var(--linea);
-    padding-right: 0;
-  }
   .acciones { flex-direction: column; align-items: stretch; }
   .acciones__canal, .acciones__descargas { display: flex; }
   .acciones__canal .boton, .acciones__descargas .boton { flex: 1; }
@@ -1298,8 +1119,6 @@ code, pre { font-family: var(--mono); }
     box-shadow: none;
     z-index: auto;
   }
-  .linea li { grid-template-columns: 64px minmax(0, 1fr); }
-  .panel__reloj { text-align: left; align-items: flex-start; }
   .panel__cabeza { gap: var(--e-4); }
 }
 
@@ -1363,9 +1182,9 @@ code, pre { font-family: var(--mono); }
   }
 }
 
-/* ------------------------------------------------------------ 15 impresión */
+/* ------------------------------------------------------------ 14 impresión */
 
-/* La página se imprime: es el modo feria en papel. La pantalla oscura se
+/* La página se imprime en papel. La pantalla oscura se
    vuelve papel —de otro modo el texto claro desaparece— y el gráfico, que
    dibuja app.js con colores de pantalla, se reescribe desde acá.
    Las consultas de ancho de arriba también actúan al imprimir (una hoja A4
@@ -1429,9 +1248,6 @@ code, pre { font-family: var(--mono); }
   .grafico svg line { stroke: var(--linea); }
   .grafico svg circle { fill: #ffffff; stroke: var(--ambar); }
   /* tamaños de papel: los titulares no se comen la hoja */
-  .portada { padding-block: 0 var(--e-6); }
-  .portada h1 { font-size: 2rem; }
-  .portada__entrada { font-size: var(--t-base); }
   .seccion h2 { font-size: 1.45rem; }
   .seccion h3 { font-size: 1.05rem; }
   .panel__titulo { font-size: 1.35rem; }
@@ -1469,7 +1285,7 @@ code, pre { font-family: var(--mono); }
   }
 
   /* nada de cortar una fila o un titular por la mitad */
-  .tabla tr, .linea li, .medidas > div, .flujo li, .estado, .aviso-vacio,
+  .tabla tr, .medidas > div, .estado, .aviso-vacio,
   .lamina, .cifras__item {
     break-inside: avoid;
   }
@@ -1558,3 +1374,150 @@ code, pre { font-family: var(--mono); }
 /* Los nombres de campo citados dentro de la tabla del panel se quedan en el
    gris de la pantalla: el agua es para los enlaces, no para una cita. */
 .panel .tabla code { color: var(--pantalla-suave); }
+
+/* === Panel de datos: el dato al frente === */
+/* El bloque de arriba responde sin desplazarse: última lectura, hace cuánto,
+   acumulado de 24 h y estado del dato. Reutiliza los tokens de la pantalla
+   oscura, así que también se imprime en papel con el resto del panel. */
+
+.hero-dato {
+  display: grid;
+  /* Lectura, estado y acumulado, en el orden en que se leen. La columna del
+     acumulado es ancha: su número y su salvedad tienen que caber en la misma
+     línea. */
+  grid-template-columns: 1.1fr 1fr 1.25fr;
+  gap: 0;
+  margin-top: var(--e-6);
+  border-top: 1px solid var(--pantalla-linea);
+  border-bottom: 1px solid var(--pantalla-linea);
+}
+
+.hero-dato > div {
+  padding: var(--e-4) var(--e-5) var(--e-5) 0;
+  border-right: 1px solid var(--pantalla-linea);
+  min-width: 0;
+}
+.hero-dato > div:last-child { border-right: 0; padding-right: 0; }
+
+.hero-dato__rotulo,
+.hero-dato__item-rotulo {
+  font-size: var(--t-2xs);
+  color: var(--pantalla-suave);
+  line-height: var(--ti-compacto);
+}
+
+.hero-dato__valor {
+  font-family: var(--serif);
+  font-size: clamp(2.6rem, 7vw, 4.2rem);
+  line-height: 1;
+  margin-top: var(--e-2);
+}
+
+.hero-dato__detalle {
+  margin-top: var(--e-3);
+  font-size: var(--t-sm);
+  color: var(--pantalla-suave);
+  line-height: var(--ti-compacto);
+}
+
+.hero-dato__item-valor {
+  font-family: var(--serif);
+  font-size: var(--t-xl);
+  line-height: 1.1;
+  margin-top: var(--e-2);
+}
+
+.hero-dato__item-nota {
+  margin-top: var(--e-2);
+  font-size: var(--t-xs);
+  color: var(--pantalla-suave);
+  line-height: var(--ti-compacto);
+}
+
+/* La salvedad del acumulado viaja pegada al número: misma línea, mismo bloque. */
+.hero-dato__item-valor .marca-dato {
+  font-family: var(--sans);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  vertical-align: middle;
+  margin-left: var(--e-2);
+  white-space: nowrap;
+}
+
+.hero-dato__respuesta {
+  margin-top: var(--e-4);
+  font-size: var(--t-lg);
+  line-height: var(--ti-texto);
+  color: var(--pantalla-tinta);
+  max-width: 66ch;
+}
+
+.hero-dato__copia {
+  margin-top: var(--e-2);
+  font-size: var(--t-sm);
+  line-height: var(--ti-compacto);
+  color: var(--pantalla-suave);
+  max-width: 76ch;
+}
+
+.hero-dato__marco {
+  margin-top: var(--e-3);
+  padding-top: var(--e-3);
+  border-top: 1px solid var(--pantalla-linea);
+  font-size: var(--t-xs);
+  line-height: var(--ti-compacto);
+  color: var(--pantalla-suave);
+  max-width: 78ch;
+}
+
+/* El filtro por punto vive junto al de canal; el contenedor ya los separa. */
+.acciones__punto { display: inline-flex; }
+
+/* La celda «Punto»: station_id y sector aproximado, del archivo. */
+.tabla .punto { white-space: normal; min-width: 9rem; }
+.punto__id { display: block; font-weight: 600; }
+.punto__sector {
+  display: block;
+  font-size: var(--t-2xs);
+  color: var(--pantalla-suave);
+  line-height: 1.25;
+  max-width: 30ch;
+}
+
+@media (max-width: 900px) {
+  .hero-dato { grid-template-columns: 1fr 1fr; }
+  .hero-dato__principal {
+    grid-column: 1 / -1;
+    border-right: 0;
+    border-bottom: 1px solid var(--pantalla-linea);
+    padding-right: 0;
+  }
+  .hero-dato > div:nth-child(2) { border-right: 1px solid var(--pantalla-linea); }
+  .hero-dato > div:nth-child(3) { border-right: 0; }
+}
+
+@media (max-width: 720px) {
+  .acciones__punto { display: flex; flex-wrap: wrap; }
+  .acciones__punto .boton { flex: 1; }
+}
+
+/* En 360 mandan el dato y su estado: la lectura ocupa la fila entera y las dos
+   cifras quedan una al lado de la otra para que se lean sin desplazarse. */
+@media (max-width: 560px) {
+  /* Menos aire arriba para que el dato entre en la primera pantalla. La lectura
+     va arriba; el estado y el acumulado comparten la fila siguiente, con la
+     columna del acumulado ancha para que su salvedad quepa al lado del número. */
+  .panel { padding-block: var(--e-5) var(--e-6); }
+  .hero-dato { margin-top: var(--e-4); grid-template-columns: 1fr 1fr; }
+  .hero-dato > div { padding-right: var(--e-3); }
+  .hero-dato__principal {
+    grid-column: 1 / -1;
+    border-right: 0;
+    border-bottom: 1px solid var(--pantalla-linea);
+    padding-right: 0;
+  }
+  .hero-dato > div:nth-child(2) { border-right: 1px solid var(--pantalla-linea); }
+  .hero-dato > div:nth-child(3) { border-right: 0; padding-right: 0; }
+  .hero-dato__valor { font-size: clamp(2.4rem, 15vw, 3.2rem); }
+  .hero-dato__item-valor { font-size: var(--t-lg); }
+}

@@ -60,8 +60,22 @@
   /* La hora de medir y la hora de publicar son distintas y se muestran las dos.
      Una publicación de otro día lleva su fecha; la misma noche, solo la hora. */
   function publicado(medidoIso, publicadoIso) {
+    /* Sin fecha válida se muestra el guion largo, no una hora inventada. */
     if (!publicadoIso) return null;
+    var instante = msDe(publicadoIso);
+    if (!isFinite(instante) || instante <= 0) return null;
     return ymd(medidoIso) === ymd(publicadoIso) ? hora(publicadoIso) : corto(publicadoIso);
+  }
+
+  /* Una fecha se valida antes de usarse: finita, posterior a 2024 y no más de un día
+     en el futuro. Lo que no pasa por acá no se usa para calcular antigüedades. */
+  function instanteValido(iso) {
+    if (!esTexto(iso)) return null;
+    var instante = msDe(iso);
+    if (!isFinite(instante) || instante <= 0) return null;
+    if (instante < Date.UTC(2024, 0, 1)) return null;
+    if (instante > Date.now() + 24 * HORA_MS) return null;
+    return instante;
   }
 
   function duracion(horas) {
@@ -75,7 +89,11 @@
   }
 
   function hace(iso) {
-    var delta = Date.now() - msDe(iso);
+    /* Una fecha ausente o inválida no se convierte en «hace N días» ni en 1970. */
+    if (!esTexto(iso)) return '';
+    var desde = msDe(iso);
+    if (!isFinite(desde) || desde <= 0) return '';
+    var delta = Date.now() - desde;
     if (!isFinite(delta)) return '';
     var horas = Math.round(Math.abs(delta) / HORA_MS);
     if (delta < 0) return 'con fecha posterior a hoy';
@@ -129,6 +147,14 @@
     if (m.temperature_c !== null && !esNumero(m.temperature_c)) return 'temperature_c no es número ni nulo';
     if (typeof m.source !== 'string' || !CANALES[m.source.toLowerCase()]) return 'source fuera del dominio';
     if (typeof m.verified !== 'boolean') return 'verified no es booleano';
+    /* `published_at` es de la copia publicada: si viene, tiene que ser una fecha
+       ISO con desfase. Si no es válida, el registro no se muestra. */
+    if (m.published_at !== undefined && m.published_at !== null) {
+      if (!esTexto(m.published_at) || !DESFASE.test(m.published_at) ||
+          !isFinite(msDe(m.published_at))) {
+        return 'published_at sin desfase horario o sin fecha válida';
+      }
+    }
     return null;
   }
 
@@ -335,6 +361,40 @@
     }));
   }
 
+  /* La última publicación es la mayor entre el metadato del archivo y la fecha de
+     publicación de cada fila: el metadato no puede quedar por detrás de lo que
+     contiene. Si una fila es posterior, se marca en la ficha. */
+  var publicadoMetaMs = instanteValido(meta.published_at);
+  var publicadoFilasMs = null;
+  for (var iPub = 0; iPub < registros.length; iPub++) {
+    var instantePub = instanteValido(registros[iPub].published_at);
+    if (instantePub !== null && (publicadoFilasMs === null || instantePub > publicadoFilasMs)) {
+      publicadoFilasMs = instantePub;
+    }
+  }
+  var publicadoMs = (publicadoMetaMs === null && publicadoFilasMs === null)
+    ? null
+    : Math.max(publicadoMetaMs === null ? 0 : publicadoMetaMs,
+               publicadoFilasMs === null ? 0 : publicadoFilasMs);
+  var publicadoIso = publicadoMs ? new Date(publicadoMs).toISOString() : null;
+
+  /* Estado del dato: al día, atrasado, sin fecha o sin datos. La referencia es la
+     última publicación; si el archivo no la declara, la última lectura del sensor. */
+  var referenciaMs = publicadoMs !== null ? publicadoMs : (auto.length ? ultimoAutoMs : null);
+  var referenciaIso = referenciaMs ? new Date(referenciaMs).toISOString() : null;
+  var edadDatoMs = referenciaMs !== null ? Date.now() - referenciaMs : null;
+  var referenciaEsPublicacion = publicadoMs !== null;
+  var estadoDato = !registros.length
+    ? 'sin-datos'
+    : (referenciaMs === null
+      ? 'sin-fecha'
+      : (edadDatoMs !== null && edadDatoMs > UMBRAL_ANTIGUO_MS ? 'atrasado' : 'al-dia'));
+
+  /* Cómo se nombra la referencia temporal: publicación solo si existe. */
+  function nombreReferencia() {
+    return referenciaEsPublicacion ? 'última publicación' : 'última lectura del sensor';
+  }
+
   /* Condición declarada en la copia publicada (campo `estado`). */
   function condiciones() {
     var vistas = [];
@@ -374,14 +434,30 @@
     ocultar('estado-rechazos');
     ocultar('estado-puntos');
     ocultar('estado-periodo');
-    /* La cabecera no se esconde: si no hay datos, el título dice el asunto y
-       no se inventa el nombre de una estación que no se pudo leer. */
-    texto('estacion-nombre', 'El registro del evento');
+    /* La cabecera y el bloque del dato no se esconden: si no hay datos, dicen
+       que no hay datos y no se inventa el nombre de un punto que no se pudo leer. */
     texto('estacion-detalle', 'El archivo de datos no llegó, así que no hay punto, período ni cifras que mostrar.');
     texto('ultima-publicacion', '');
     limpiar(porId('ultima-publicacion'));
     ponerAusente('ultima-publicacion', 'sin fecha de publicación');
     limpiar(porId('ultima-publicacion-edad'));
+    ponerAusente('h-ultima', 'sin datos');
+    texto('h-ultima-detalle', 'El archivo de datos no llegó.');
+    ponerAusente('h-acumulado', 'sin datos');
+    texto('h-acumulado-nota', 'Sin lecturas no hay acumulado que calcular.');
+    var cajaEstadoError = porId('h-estado');
+    if (cajaEstadoError) {
+      limpiar(cajaEstadoError);
+      cajaEstadoError.appendChild(marcaDato('Sin datos', 'marca-dato--vacio'));
+    }
+    texto('h-estado-nota', 'No se pudo leer el archivo de datos.');
+    texto('h-respuesta', 'No se puede decir si llueve: el archivo de datos no llegó.');
+    texto('h-copia', 'Esta página es una copia estática: muestra la última publicación y no recibe mediciones en vivo.');
+    texto('e-publicacion', 'sin datos');
+    texto('e-generado', 'sin datos');
+    texto('e-antiguedad', 'sin datos');
+    texto('e-cierre', 'No se pudo leer el archivo de datos: no hay registro que mostrar.');
+    texto('pie-actualizado', 'sin datos');
     texto('estado-error-motivo', motivo);
     mostrar('estado-error');
   }
@@ -389,8 +465,6 @@
   /* ---------------------------------------------------------------- ficha */
 
   function pintarFicha() {
-    texto('estacion-nombre', esTexto(estacion.name) ? estacion.name : 'Punto sin nombre declarado');
-
     var detalle = [];
     if (esTexto(estacion.sector)) detalle.push(estacion.sector);
     if (esTexto(estacion.region)) detalle.push(estacion.region);
@@ -404,37 +478,29 @@
     limpiar(porId('ultima-publicacion'));
     limpiar(porId('ultima-publicacion-edad'));
 
-    /* La última publicación es la mayor entre el metadato del archivo y la fecha de
-       publicación de cada fila: el metadato no puede quedar por detrás de lo que
-       contiene. Si la fila es posterior, se marca en la ficha. */
-    var publicadoMetaMs = esTexto(meta.published_at) && isFinite(msDe(meta.published_at))
-      ? msDe(meta.published_at)
-      : null;
-    var publicadoFilasMs = null;
-    for (var i = 0; i < registros.length; i++) {
-      var marcaFila = registros[i].published_at;
-      if (esTexto(marcaFila) && isFinite(msDe(marcaFila))) {
-        var t = msDe(marcaFila);
-        if (publicadoFilasMs === null || t > publicadoFilasMs) publicadoFilasMs = t;
-      }
-    }
-    var publicadoMs = Math.max(publicadoMetaMs === null ? 0 : publicadoMetaMs,
-      publicadoFilasMs === null ? 0 : publicadoFilasMs);
-    var publicadoIso = publicadoMs ? new Date(publicadoMs).toISOString() : null;
-
     if (publicadoIso) {
       texto('ultima-publicacion', cuando(publicadoIso));
       var edad = Date.now() - publicadoMs;
-      porId('ultima-publicacion-edad').appendChild(
-        marcaDato(hace(publicadoIso), edad > UMBRAL_ANTIGUO_MS ? 'marca-dato--antiguo' : null)
-      );
+      var cajaEdad = porId('ultima-publicacion-edad');
+      if (cajaEdad) {
+        cajaEdad.appendChild(
+          marcaDato(hace(publicadoIso), edad > UMBRAL_ANTIGUO_MS ? 'marca-dato--antiguo' : null)
+        );
+      }
     } else {
       ponerAusente('ultima-publicacion', 'sin fecha de publicación en el archivo');
     }
 
-    texto('f-punto', (esTexto(estacion.id) ? estacion.id : 'sin identificador') + ' · ' +
-      (esTexto(estacion.commune) ? estacion.commune : 'comuna no declarada') +
-      ', sector aproximado');
+    /* El punto sale de los metadatos del archivo, con su carácter aproximado.
+       Nunca una dirección: el sector tal como lo declara el archivo. */
+    var partesPunto = [];
+    if (esTexto(estacion.id)) partesPunto.push(estacion.id);
+    if (esTexto(estacion.sector)) partesPunto.push(estacion.sector);
+    if (!esTexto(estacion.sector)) {
+      if (esTexto(estacion.commune)) partesPunto.push(estacion.commune);
+      if (esTexto(estacion.region)) partesPunto.push(estacion.region);
+    }
+    texto('f-punto', partesPunto.length ? partesPunto.join(' · ') : 'el archivo no declara el punto');
 
     var intervalo = esNumero(estacion.interval_min) ? entero(estacion.interval_min) + ' min' : null;
     texto('f-unidad', 'Milímetros de lluvia (mm) por registro.' +
@@ -511,6 +577,129 @@
           ': el panel no afirma que sean mediciones reales.'));
       }
     }
+  }
+
+  /* ------------------------------------------------------------ dato al frente */
+
+  /* El bloque de arriba responde, sin desplazarse: cuánto llovió en la última
+     lectura, hace cuánto fue, cuánto suma la ventana de 24 h y si el dato está
+     al día o atrasado. Todo sale del archivo; acá no se calcula ninguna cifra
+     nueva que no esté en los datos. */
+  function pintarHero() {
+    var ultima = auto.length ? auto[auto.length - 1] : null;
+
+    limpiar(porId('h-ultima'));
+    if (ultima && puntoUnico) {
+      texto('h-ultima', uno(ultima.rainfall_mm) + ' mm');
+      texto('h-ultima-detalle', 'Registrada el ' + cuando(ultima.timestamp) + ' · ' + hace(ultima.timestamp));
+    } else if (ultima) {
+      ponerAusente('h-ultima', 'el archivo mezcla puntos: no hay una última lectura única');
+      texto('h-ultima-detalle', 'El archivo trae más de un punto y no se elige uno.');
+    } else {
+      ponerAusente('h-ultima', 'sin lecturas del sensor en el archivo');
+      texto('h-ultima-detalle', 'El archivo no trae lecturas del sensor.');
+    }
+
+    var cajaAcumulado = porId('h-acumulado');
+    limpiar(cajaAcumulado);
+    var nota = porId('h-acumulado-nota');
+    limpiar(nota);
+    var item24 = porId('item-24h-hero');
+    if (auto.length && puntoUnico) {
+      /* La salvedad viaja pegada al número: misma línea, mismo bloque. */
+      cajaAcumulado.appendChild(document.createTextNode(uno(acumulado24) + ' mm'));
+      if (!ventanaCompleta) {
+        if (item24) item24.setAttribute('data-estado', 'parcial');
+        cajaAcumulado.appendChild(document.createTextNode(' '));
+        cajaAcumulado.appendChild(marcaDato('ventana incompleta', null));
+      } else if (item24) {
+        item24.removeAttribute('data-estado');
+      }
+      texto('h-acumulado-nota', 'Hasta la última lectura (' +
+        corto(new Date(ultimoAutoMs)) + ').');
+    } else {
+      ponerAusente('h-acumulado', auto.length
+        ? 'el archivo mezcla puntos: no se suman'
+        : 'sin lecturas del sensor');
+      texto('h-acumulado-nota', auto.length
+        ? 'Un acumulado que sume puntos distintos no existe, así que no se calcula.'
+        : 'Sin lecturas del sensor no hay acumulado que mostrar.');
+      if (item24) item24.removeAttribute('data-estado');
+    }
+
+    var cajaEstado = porId('h-estado');
+    if (cajaEstado) {
+      limpiar(cajaEstado);
+      if (estadoDato === 'sin-datos') cajaEstado.appendChild(marcaDato('Sin datos', 'marca-dato--vacio'));
+      else if (estadoDato === 'sin-fecha') cajaEstado.appendChild(marcaDato('Sin fecha', 'marca-dato--vacio'));
+      else if (estadoDato === 'atrasado') cajaEstado.appendChild(marcaDato('Atrasado', 'marca-dato--antiguo'));
+      else cajaEstado.appendChild(marcaDato('Al día', null));
+    }
+    if (estadoDato === 'sin-datos') {
+      texto('h-estado-nota', 'No hay registros publicados.');
+    } else if (estadoDato === 'sin-fecha') {
+      texto('h-estado-nota', 'No hay fecha de publicación ni lectura del sensor: el dato no ' +
+        'se puede ubicar en el tiempo.');
+    } else {
+      texto('h-estado-nota', 'La ' + nombreReferencia() + ' es de ' + hace(referenciaIso) +
+        (estadoDato === 'atrasado' ? '. El registro no describe la lluvia de ahora.' : '.'));
+    }
+
+    var respuesta;
+    if (!registros.length) {
+      respuesta = 'No hay registros publicados, así que no se puede decir si llueve.';
+    } else if (!auto.length) {
+      respuesta = 'No hay lecturas del sensor en esta copia: solo hay lecturas del lector ' +
+        'manual, así que no se puede decir si llueve.';
+    } else if (!puntoUnico) {
+      respuesta = 'El archivo mezcla puntos: no hay una última lectura única de la que se ' +
+        'pueda decir si llueve.';
+    } else {
+      respuesta = (ultima.rainfall_mm > 0
+        ? 'El último registro marca ' + uno(ultima.rainfall_mm) + ' mm de lluvia en su intervalo'
+        : 'El último registro no marca lluvia') +
+        ' (' + corto(ultima.timestamp) + ', ' + hace(ultima.timestamp) + ').';
+      if (estadoDato === 'atrasado') {
+        respuesta += ' Es el registro más reciente de esta copia: no hay mediciones posteriores.';
+      }
+    }
+    texto('h-respuesta', respuesta);
+
+    var copia = 'Esta página es una copia estática: muestra la última publicación y no recibe ' +
+      'mediciones en vivo.';
+    copia += publicadoIso
+      ? ' Actualizada el ' + cuando(publicadoIso) + ' (' + hace(publicadoIso) + ').'
+      : ' El archivo no declara fecha de publicación.';
+    texto('h-copia', copia);
+  }
+
+  function pintarEstadoDato() {
+    texto('e-publicacion', publicadoIso
+      ? cuando(publicadoIso) + ' (' + hace(publicadoIso) + ')'
+      : 'el archivo no declara fecha de publicación');
+    var generadoMs = instanteValido(meta.generated_at);
+    texto('e-generado', generadoMs !== null
+      ? cuando(new Date(generadoMs).toISOString()) + ' (' + hace(new Date(generadoMs).toISOString()) + ')'
+      : 'el archivo no declara fecha de generación');
+    texto('e-antiguedad', referenciaIso
+      ? hace(referenciaIso) + ', contados desde el ' + cuando(referenciaIso) +
+        ' (' + nombreReferencia() + ')'
+      : 'No hay fecha de publicación ni lectura del sensor: el archivo no permite ubicar el dato en el tiempo.');
+    var cierre;
+    if (estadoDato === 'sin-datos') {
+      cierre = 'No hay registros en esta copia. La página no completa el vacío con cero.';
+    } else if (estadoDato === 'sin-fecha') {
+      cierre = 'No hay fecha de publicación ni lectura del sensor con la que ubicar el dato: ' +
+        'no se puede decir si es reciente.';
+    } else if (estadoDato === 'atrasado') {
+      cierre = 'El dato está atrasado: la ' + nombreReferencia() + ' es de ' + hace(referenciaIso) +
+        '. El archivo sirve para leer lo que se registró, no para saber si está lloviendo ahora.';
+    } else {
+      cierre = 'El dato está al día: la ' + nombreReferencia() + ' es de ' + hace(referenciaIso) +
+        '. Aun así, esta página no recibe mediciones en vivo.';
+    }
+    texto('e-cierre', cierre);
+    texto('pie-actualizado', publicadoIso ? cuando(publicadoIso) : 'sin fecha');
   }
 
   /* --------------------------------------------------------------- cifras */
@@ -600,6 +789,7 @@
     var bloquePeriodo = porId('estado-periodo');
     if (bloquePeriodo) {
       if (auto.length && !ventanaCompleta) {
+        bloquePeriodo.hidden = false;
         texto('estado-periodo-texto',
           'La serie del sensor va del ' + corto(new Date(primeroAutoMs)) + ' al ' +
           corto(new Date(ultimoAutoMs)) + ': ' + duracion(horasSensor) + '. La ventana de 24 h ' +
@@ -610,7 +800,6 @@
         texto('estado-periodo-pie',
           'Falta la serie anterior al ' + corto(new Date(primeroAutoMs)) +
           '. No se rellena con cero: se declara.');
-        bloquePeriodo.hidden = false;
       } else {
         bloquePeriodo.hidden = true;
       }
@@ -814,14 +1003,44 @@
 
   /* ---------------------------------------------------------------- tabla */
 
-  var filtro = 'todo';
+  var filtroCanal = 'todo';
+  var filtroPunto = 'todo';
 
   /* Los botones del filtro usan los valores reales de `source`: `automatico`
      y `manual`. Así no hay un tercer nombre para el sensor en el código. */
-  function etiquetaFiltro() {
-    if (filtro === 'automatico') return 'solo sensor automático';
-    if (filtro === 'manual') return 'solo lector manual';
+  function etiquetaFiltroCanal() {
+    if (filtroCanal === 'automatico') return 'solo sensor automático';
+    if (filtroCanal === 'manual') return 'solo lector manual';
     return 'todos los canales';
+  }
+
+  function etiquetaFiltroPunto() {
+    return filtroPunto === 'todo' ? 'todos los puntos' : 'punto ' + filtroPunto;
+  }
+
+  /* Un botón por punto declarado en el archivo; nunca se inventa un punto que no
+     esté en los datos. */
+  function crearFiltroPunto() {
+    var caja = porId('filtro-punto');
+    if (!caja) return;
+    limpiar(caja);
+    var opciones = [{ valor: 'todo', texto: 'Todos los puntos' }];
+    puntos.forEach(function (punto) { opciones.push({ valor: punto, texto: punto }); });
+    opciones.forEach(function (opcion, indice) {
+      var boton = nodo('button', 'boton boton--suave', opcion.texto);
+      boton.type = 'button';
+      boton.setAttribute('data-filtro-punto', opcion.valor);
+      boton.setAttribute('aria-pressed', indice === 0 ? 'true' : 'false');
+      boton.setAttribute('aria-controls', 'tabla-registro');
+      boton.addEventListener('click', function () {
+        filtroPunto = opcion.valor;
+        Array.prototype.forEach.call(caja.querySelectorAll('[data-filtro-punto]'), function (b) {
+          b.setAttribute('aria-pressed', b === boton ? 'true' : 'false');
+        });
+        pintarTabla();
+      });
+      caja.appendChild(boton);
+    });
   }
 
   function pintarTabla() {
@@ -831,11 +1050,13 @@
 
     var frag = document.createDocumentFragment();
     var visibles = 0;
+    var puntoAnterior = null;
 
     for (var i = 0; i < filasTabla.length; i++) {
       var item = filasTabla[i];
       var f = item.fila;
-      if (filtro !== 'todo' && f.source !== filtro) continue;
+      if (filtroCanal !== 'todo' && f.source !== filtroCanal) continue;
+      if (filtroPunto !== 'todo' && f.station_id !== filtroPunto) continue;
       visibles++;
 
       var tr = document.createElement('tr');
@@ -882,11 +1103,18 @@
       }
       tr.appendChild(tTemp);
 
-      /* El punto de la fila, resuelto con el nombre de la estación cuando coincide. */
+      /* El punto de la fila: su station_id y, la primera vez que aparece cada
+         punto, el sector aproximado tal como lo declaran los metadatos. El id
+         va en todas las filas; el sector no se repite cuarenta veces. */
       var tPunto = document.createElement('td');
-      tPunto.textContent = esTexto(estacion.id) && f.station_id === estacion.id && esTexto(estacion.name)
-        ? f.station_id + ' · ' + estacion.name
-        : f.station_id;
+      tPunto.className = 'punto';
+      tPunto.appendChild(nodo('span', 'punto__id', f.station_id));
+      if (f.station_id !== puntoAnterior) {
+        if (esTexto(estacion.sector) && f.station_id === estacion.id) {
+          tPunto.appendChild(nodo('span', 'punto__sector', estacion.sector));
+        }
+        puntoAnterior = f.station_id;
+      }
       tr.appendChild(tPunto);
 
       var tCanal = document.createElement('td');
@@ -914,7 +1142,8 @@
     cuerpo.appendChild(frag);
 
     var resumen = 'Mostrando ' + visibles + ' de ' + registros.length + ' ' +
-      plural(registros.length, 'registro', 'registros') + ' (' + etiquetaFiltro() + '). ' +
+      plural(registros.length, 'registro', 'registros') + ' (' + etiquetaFiltroCanal() +
+      ', ' + etiquetaFiltroPunto() + '). ' +
       auto.length + ' del sensor automático y ' + manuales.length + ' ' +
       plural(manuales.length, 'lectura manual', 'lecturas manuales') +
       ' en el archivo completo.';
@@ -1159,6 +1388,8 @@
   function arrancar() {
     if (!registros.length) {
       ocultar('estado-carga');
+      pintarHero();
+      pintarEstadoDato();
       pintarFicha();
       ocultar('panel-datos');
       ocultar('estado-sin-sensor');
@@ -1178,6 +1409,8 @@
 
     if (rechazos.length) mostrarRechazos();
 
+    pintarHero();
+    pintarEstadoDato();
     pintarFicha();
 
     if (!auto.length) {
@@ -1193,10 +1426,10 @@
       ocultar('cifras');
       ocultar('estado-periodo');
       ocultar('estado-sin-sensor');
+      mostrar('estado-puntos');
       texto('estado-puntos-texto', 'El archivo trae ' + puntos.length + ' puntos distintos (' +
         puntos.join(', ') + '). Un acumulado que sume puntos distintos no existe, así que no ' +
         'se calcula: la tabla muestra el punto de cada fila y los totales quedan fuera.');
-      mostrar('estado-puntos');
     } else {
       mostrar('grafico-caja');
       mostrar('cifras');
@@ -1219,16 +1452,17 @@
       redibujar = setTimeout(dibujar, 180);
     });
 
-    var botones = document.querySelectorAll('[data-filtro]');
-    Array.prototype.forEach.call(botones, function (boton) {
+    var botonesCanal = document.querySelectorAll('[data-filtro-canal]');
+    Array.prototype.forEach.call(botonesCanal, function (boton) {
       boton.addEventListener('click', function () {
-        filtro = boton.getAttribute('data-filtro');
-        Array.prototype.forEach.call(botones, function (b) {
+        filtroCanal = boton.getAttribute('data-filtro-canal');
+        Array.prototype.forEach.call(botonesCanal, function (b) {
           b.setAttribute('aria-pressed', b === boton ? 'true' : 'false');
         });
         pintarTabla();
       });
     });
+    crearFiltroPunto();
 
     var btnCsv = porId('btn-csv');
     if (btnCsv) btnCsv.addEventListener('click', csv);
