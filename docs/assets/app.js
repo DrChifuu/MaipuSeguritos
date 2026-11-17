@@ -498,6 +498,18 @@
         'El archivo se declara «' + rotuloCondicion().replace(/\.$/, '') +
         '». Los dos archivos descargables llevan ese rótulo adentro: si uno circula suelto, ' +
         'tiene que poder identificarse igual.'));
+      /* El contrato pide `estado` en la copia publicada: si falta, se avisa el lote. */
+      var sinCondicion = 0;
+      for (var c = 0; c < registros.length; c++) {
+        if (!esTexto(registros[c].estado)) sinCondicion++;
+      }
+      if (sinCondicion) {
+        pie.appendChild(document.createTextNode(' ' +
+          (sinCondicion === registros.length
+            ? 'Ningún registro declara la condición del dato (`estado`)'
+            : sinCondicion + ' de ' + registros.length + ' registros no declaran la condición del dato (`estado`)') +
+          ': el panel no afirma que sean mediciones reales.'));
+      }
     }
   }
 
