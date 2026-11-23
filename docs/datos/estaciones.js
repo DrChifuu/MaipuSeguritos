@@ -1,10 +1,9 @@
-// Archivo generado por generar_datos.py — no editar a mano.
-// Datos simulados para prueba: no son mediciones reales.
-// Los siete campos del registro son los del firmware (maipo_vigia_esp32.ino:320-325).
-// Cada entrada es un punto; los campos derivados salen de los registros, no se editan.
-// Los cinco puntos propuestos no tienen sensor ni lecturas: no hay nada instalado.
-// El estado de acceso lo informa una persona o un documento; sin fuente y sin hora es
-// sin_informacion, y no se deduce del clima ni de que falten datos (panel-web/estaciones.md).
+// Archivo generado por fuente_sqlite.py — no editar a mano.
+// Datos de la base de Maipo Vigía (SQLite): los acumulados y los estados salen de los registros.
+// Los seis puntos son la tabla maestra (datos/puntos.py); sin lectura son sin_datos y su
+// acumulado es null, nunca 0 mm. La ventana de 24 h se informa con las marcas reales que cubre.
+// El estado de acceso lo declara una persona o un documento; sin fuente y sin hora es
+// sin_informacion. El color del semáforo no se publica: se calcula con umbrales_version vigente.
 // window.ESTACIONES es un arreglo con una entrada por punto de medición; los campos
 // derivados salen de window.REGISTROS.measurements agrupado por station_id
 // (ver panel-web/datos/estaciones.py y panel-web/estaciones.md).
@@ -16,14 +15,14 @@ window.ESTACIONES = [
     "quebrada": null,
     "sector": "San José de Maipo, sector Plaza de Armas (ubicación aproximada)",
     "elevacion_m": 1080,
-    "estado_dato": "atrasado",
-    "ultima_lectura": "2026-11-15T00:40:00-03:00",
-    "lecturas": 40,
-    "lecturas_manuales": 1,
-    "acumulado_24h_mm": 24.0,
-    "acumulado_24h_desde": "2026-11-14T18:00:00-03:00",
-    "acumulado_24h_hasta": "2026-11-15T00:40:00-03:00",
-    "referencia_dato": "2026-11-15T02:45:00-03:00",
+    "estado_dato": "sin_datos",
+    "ultima_lectura": null,
+    "lecturas": 0,
+    "lecturas_manuales": 0,
+    "acumulado_24h_mm": null,
+    "acumulado_24h_desde": null,
+    "acumulado_24h_hasta": null,
+    "referencia_dato": "2026-11-23T00:15:49-03:00",
     "procedencia": {
       "propuesto": false,
       "documento": "panel-web/especificacion.md",
@@ -50,7 +49,7 @@ window.ESTACIONES = [
     "acumulado_24h_mm": null,
     "acumulado_24h_desde": null,
     "acumulado_24h_hasta": null,
-    "referencia_dato": "2026-11-15T02:45:00-03:00",
+    "referencia_dato": "2026-11-23T00:15:49-03:00",
     "procedencia": {
       "propuesto": true,
       "documento": "Chat_Maipo_exportado_2026-10-25.txt",
@@ -77,7 +76,7 @@ window.ESTACIONES = [
     "acumulado_24h_mm": null,
     "acumulado_24h_desde": null,
     "acumulado_24h_hasta": null,
-    "referencia_dato": "2026-11-15T02:45:00-03:00",
+    "referencia_dato": "2026-11-23T00:15:49-03:00",
     "procedencia": {
       "propuesto": true,
       "documento": "Chat_Maipo_exportado_2026-10-25.txt",
@@ -104,7 +103,7 @@ window.ESTACIONES = [
     "acumulado_24h_mm": null,
     "acumulado_24h_desde": null,
     "acumulado_24h_hasta": null,
-    "referencia_dato": "2026-11-15T02:45:00-03:00",
+    "referencia_dato": "2026-11-23T00:15:49-03:00",
     "procedencia": {
       "propuesto": true,
       "documento": "Chat_Maipo_exportado_2026-10-25.txt",
@@ -131,7 +130,7 @@ window.ESTACIONES = [
     "acumulado_24h_mm": null,
     "acumulado_24h_desde": null,
     "acumulado_24h_hasta": null,
-    "referencia_dato": "2026-11-15T02:45:00-03:00",
+    "referencia_dato": "2026-11-23T00:15:49-03:00",
     "procedencia": {
       "propuesto": true,
       "documento": "MaipuSeguritos/bitacora/S03.md",
@@ -158,7 +157,7 @@ window.ESTACIONES = [
     "acumulado_24h_mm": null,
     "acumulado_24h_desde": null,
     "acumulado_24h_hasta": null,
-    "referencia_dato": "2026-11-15T02:45:00-03:00",
+    "referencia_dato": "2026-11-23T00:15:49-03:00",
     "procedencia": {
       "propuesto": true,
       "documento": "Chat_Maipo_exportado_2026-10-25.txt",

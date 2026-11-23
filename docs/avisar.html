@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="Aviso de un vecino sin registro: se prepara en el navegador y no se envía a ningún servidor.">
+<title>Maipo Vigía · Avisar algo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32'%3E%3Crect x='6' y='2' width='12' height='28' rx='6' fill='none' stroke='%230E6C7C' stroke-width='2'/%3E%3Cpath d='M8 20h8v8a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z' fill='%230E6C7C'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/estilos.css">
+<script src="datos/estaciones.js" defer></script>
+<script src="datos/historicos.js" defer></script>
+<script src="assets/paginas.js" defer></script>
+</head>
+<body>
+<header class="barra-superior">
+  <div class="contenedor barra-superior-interior">
+    <a class="marca-barra" href="index.html">
+      <svg viewBox="0 0 24 32" width="19" height="25" aria-hidden="true">
+        <rect x="6" y="2" width="12" height="28" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M8 20h8v8a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z" fill="currentColor"/>
+      </svg>
+      Maipo Vigía
+    </a>
+    <nav class="nav-principal" aria-label="Navegación principal">
+      <a class="nav-enlace" href="index.html" aria-current="page">Ahora</a>
+      <a class="nav-enlace" href="registrar.html">Registrar</a>
+      <a class="nav-enlace" href="historial.html">Historial</a>
+    </nav>
+  </div>
+</header>
+<main>
+<div class="contenedor">
+
+<h1 class="titulo-pagina">Avisar algo</h1>
+<p class="bajada-pagina">Si vio algo en el camino o en el punto de medición, puede preparar un aviso sin registrar lecturas. No pida ni escriba datos personales.</p>
+<div class="campo">
+  <label for="aviso-zona">Lugar</label>
+  <select id="aviso-zona" data-selector-zonas></select>
+</div>
+<div class="campo">
+  <label for="aviso-texto">Qué pasó</label>
+  <textarea id="aviso-texto" placeholder="Describa el hecho sin nombres ni contactos"></textarea>
+</div>
+<div class="acciones-pagina">
+  <button class="boton-primario" id="aviso-preparar" type="button">Preparar aviso</button>
+  <a class="boton-secundario" href="index.html">Volver al tablero</a>
+</div>
+<p class="nota-pagina" id="aviso-vista">Todavía no hay un aviso preparado. Esta copia no envía el texto.</p>
+</div>
+</main>
+<nav class="barra-inferior" aria-label="Navegación móvil">
+  <a class="nav-movil-item" href="index.html" aria-current="page">Ahora</a>
+  <a class="nav-movil-item" href="registrar.html">Registrar</a>
+  <a class="nav-movil-item" href="historial.html">Historial</a>
+</nav>
+<footer class="pie">
+  <div class="contenido">
+    <p class="pie__titulo">Todas las páginas</p>
+    <ul class="enlaces-pie">
+      <li><a href="index.html">Ahora</a></li>
+      <li><a href="zona.html">Detalle de una zona</a></li>
+      <li><a href="registrar.html">Registrar una lectura</a></li>
+      <li><a href="avisar.html">Avisar algo</a></li>
+      <li><a href="historial.html">Historial de archivos</a></li>
+      <li><a href="archivo.html">Archivo abierto</a></li>
+      <li><a href="camino.html">El camino de hoy</a></li>
+      <li><a href="ayuda.html">Cómo leer el tablero</a></li>
+      <li><a href="kiosco.html">Pantalla de kiosco</a></li>
+      <li><a href="observadores.html">Padrón de observadores</a></li>
+    </ul>
+    <p class="pie__legal">Copia estática del proyecto. No emite alertas y no reemplaza a los organismos oficiales.</p>
+  </div>
+</footer>
+</body>
+</html>

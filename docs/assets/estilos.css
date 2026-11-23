@@ -2251,3 +2251,765 @@ code, pre { font-family: var(--mono); }
   #tablero .estacion__acumulado { order: 7; }
   #tablero .estacion__nota { order: 8; }
 }
+
+/* ==========================================================================
+   16 · CAPA UNIFICADA DE LAS TRECE PANTALLAS
+
+   Las trece pantallas de stitch/entrega2/crudo/stitch_maipo_vig_* traían un
+   :root propio y utilidades repetidas. Acá queda la intersección buena, escrita
+   con los nombres que ya usa el sistema: superficies, tinta, filetes y la
+   escala de espaciado de la sección 02. Es una capa que se agrega: no se
+   renombró ni se redefinió ninguna clase de las secciones 01 a 15.
+
+   Las tres caras de tipo ya están declaradas en la sección 01 y apuntan a
+   fuentes/plex-400.woff2, fuentes/plex-600.woff2 y
+   fuentes/spectral-600.woff2. No se declaran dos veces y no hay peticiones a
+   la red. Los iconos son SVG en línea con currentColor: no hay fuentes de
+   iconos. Filetes, radios, padding y gap se escriben con su valor literal: el
+   motor de render usado en la verificación no resuelve var() dentro de esas
+   propiedades abreviadas, y una tarjeta sin borde deja de decir su estado.
+   Los tokens siguen siendo la fuente documentada de esos valores.
+
+   COMPARACIÓN CON EL :root VIGENTE
+   ---------------------------------------------------------------------------
+   Se conserva                     Se agrega de las pantallas
+   --papel, --papel-alto           --radio 8 px, --radio-chico 4 px,
+   --tinta, --tinta-2, --tinta-3   --radio-grande 12 px (9, 5 y 1 pantallas)
+   --linea, --agua                 --t-enlace 26 px (10 pantallas)
+   --sans, --serif, --mono         --borde-claro #C4D0CD (9 pantallas)
+   escala --t-2xs a --t-cifra      --alto-barra 72 / --alto-barra-movil 64
+   espaciado --e-1 a --e-8         --alto-inferior 80 / --tope-tacto 56
+   interlíneas --ti-*              los cuatro pigmentos del semáforo
+
+   El --borde de las pantallas no se copia con ese nombre: --linea ya cumple
+   el mismo papel en el sistema. Se agrega --borde-claro con el valor exacto
+   de las nueve pantallas que lo traen, para los componentes nuevos. Tampoco
+   se renombran --verde, --ambar ni --oxido: pertenecen al panel oscuro y a la
+   impresión. Por eso los semáforos se llaman --sem-*.
+
+   TABLA DE TOKENS · contraste WCAG medido sobre papel
+   ---------------------------------------------------------------------------
+   Token                Valor      Sobre papel  Sobre papel alto  Uso
+   ---------------------------------------------------------------------------
+   --papel              #E8EDEB       1,00:1        1,10:1        fondo de página
+   --papel-alto         #F4F7F5       1,10:1        1,00:1        tarjeta, tabla
+   --tinta              #15212A      13,83:1       15,18:1        texto principal
+   --tinta-2            #33424B       8,78:1        9,63:1        texto de apoyo
+   --borde-claro        #C4D0CD       1,34:1        1,47:1        filetes (no texto)
+   --agua               #0E6474       5,74:1        6,29:1        filetes y marcas
+   --agua-tinta         #0B5563       7,12:1        7,81:1        enlaces y botón
+   --sem-verde          #14573A       7,23:1        7,93:1        normal / al día
+   --sem-aviso          #6D4004       7,44:1        8,16:1        ojo / atrasado
+   --sem-error          #8C1D18       7,70:1        8,45:1        peligro
+   --sem-sin-dato       #3B4A52       7,76:1        8,51:1        sin dato
+   --sem-verde-relleno  #D8E7DC       1,08:1        1,19:1        fondo de marca
+   --sem-aviso-relleno  #F6E3B8       1,07:1        1,17:1        fondo de marca
+   --sem-error-relleno  #F3D2CB       1,19:1        1,31:1        fondo de marca
+   --sem-sin-relleno    #E2E6E5       1,06:1        1,17:1        fondo de marca
+   --pantalla           #0F242C      13,56:1       14,87:1        hover del botón
+   --blanco             #FFFFFF       1,18:1        1,08:1        texto del botón
+   ---------------------------------------------------------------------------
+   Familia      Tokens                     Valores compartidos
+   ---------------------------------------------------------------------------
+   Tipografía   --t-2xs … --t-cifra        16 / 17 / 18 / 19 / 20 / 24 / 26 /
+                                          28-36 / 32-48 / 38,4-67,2 / 48-72 px
+   Interlínea   --ti-titular … --ti-texto  1,05 / 1,15 / 1,4 / 1,65
+   Espaciado    --e-1 … --e-8              4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 px
+   Radios       --radio-chico, --radio,    4 / 8 / 12 px
+                --radio-grande
+   Barras       --tope-tacto,              56 px de toque; 72 escritorio;
+                --alto-barra*,             64 celular; 80 inferior
+                --alto-inferior
+
+   Los rellenos son fondo, nunca tinta: la palabra encima va siempre en
+   --tinta, que es lo que más contrasta. Medido sobre cada relleno:
+     #15212A sobre #D8E7DC = 12,77:1   #15212A sobre #F6E3B8 = 12,94:1
+     #15212A sobre #F3D2CB = 11,61:1   #15212A sobre #E2E6E5 = 13,01:1
+   Y el texto blanco del botón primario: #FFFFFF sobre #0B5563 = 8,42:1.
+
+   Los cuatro colores del semáforo son los de las pantallas, sin excepción:
+   #14573A, #6D4004, #8C1D18 y #3B4A52, con rellenos #D8E7DC, #F6E3B8,
+   #F3D2CB y #E2E6E5. El sistema de lectura fácil conserva sus propios
+   --verde, --ambar y --oxido para el panel oscuro y la impresión; por eso los
+   semáforos de estas pantallas llevan nombre aparte y no pisan los anteriores.
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Alias de familia: el marcado portado puede usar los nombres del diseño. */
+  --font-sans: var(--sans);
+  --font-serif: var(--serif);
+  --font-mono: var(--mono);
+
+  /* Pigmentos del semáforo, con los valores exactos de las trece pantallas. */
+  --sem-verde: #14573A;
+  --sem-verde-relleno: #D8E7DC;
+  --sem-aviso: #6D4004;
+  --sem-aviso-relleno: #F6E3B8;
+  --sem-error: #8C1D18;
+  --sem-error-relleno: #F3D2CB;
+  --sem-sin-dato: #3B4A52;
+  --sem-sin-relleno: #E2E6E5;
+
+  --borde-claro: #C4D0CD;   /* el --borde de nueve pantallas, sobre papel */
+  --blanco: #FFFFFF;
+
+  /* La intersección de las pantallas: 8 px en las tarjetas y los botones,
+     4 px en las marcas, 12 px en los recuadros grandes. Ninguna sombra. */
+  --radio: 8px;
+  --radio-chico: 4px;
+  --radio-grande: 12px;
+
+  /* Escala y ritmo compartidos. El piso sigue siendo 16 px y el cuerpo 20 px. */
+  --t-enlace: 1.625rem;      /* 26 px · enlace grande de las tarjetas */
+  --alto-barra: 4.5rem;      /* 72 px en escritorio */
+  --alto-barra-movil: 4rem;  /* 64 px en celular */
+  --alto-inferior: 5rem;     /* 80 px de la barra inferior */
+  --tope-tacto: 3.5rem;      /* 56 px de botones y enlaces */
+}
+
+/* Los contenedores de las pantallas portadas. No se confunden con
+   .contenido (1180 px y canal fluido) ni con .principal del panel actual. */
+.contenedor {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.principal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-block: 12px 40px;
+}
+
+/* ------------------------------------------------- 16.1 barra superior */
+
+.barra-superior {
+  min-height: var(--alto-barra);
+  display: flex;
+  align-items: center;
+  background: var(--papel);
+  border-bottom: 1px solid #C4D0CD;
+}
+
+.barra-superior-interior {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.barra-izquierda,
+.barra-derecha { display: flex; align-items: center; }
+.barra-izquierda { gap: 28px; }
+.barra-derecha { gap: var(--e-4); }
+
+/* `.marca` ya existe en la cabecera del sitio: solo se toca dentro de la
+   barra nueva, que hoy no está en index.html. Así no se rompe el logotipo. */
+.barra-superior .marca,
+.marca-barra {
+  min-height: var(--tope-tacto);
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--serif);
+  font-size: var(--t-enlace);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--tinta);
+  text-decoration: none;
+}
+
+.nav-principal { display: flex; align-items: center; gap: 8px; }
+
+.nav-enlace {
+  min-width: var(--tope-tacto);
+  min-height: var(--tope-tacto);
+  padding-inline: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--tinta-2);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+}
+.nav-enlace[aria-current='page'] {
+  color: var(--agua-tinta);
+  border-bottom-color: #0E6474;
+}
+
+.etiqueta-ejemplo {
+  padding: 4px 10px;
+  border: 1px solid #C4D0CD;
+  border-radius: 4px;
+  background: var(--papel-alto);
+  color: var(--tinta-2);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+}
+
+.hora-actualizacion {
+  color: var(--tinta-2);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------- 16.2 barra inferior móvil */
+
+/* En escritorio no existe: la navegación va en la barra superior. */
+.barra-inferior { display: none; }
+
+@media (max-width: 720px) {
+  .barra-superior {
+    min-height: var(--alto-barra-movil);
+    padding: 4px 16px;
+    gap: 12px;
+  }
+  .nav-principal, .etiqueta-ejemplo { display: none; }
+
+  .barra-inferior {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 30;
+    min-height: var(--alto-inferior);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--papel-alto);
+    border-top: 2px solid #C4D0CD;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .nav-movil-item {
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-top: 4px solid transparent;
+    color: var(--tinta-2);
+    font-size: var(--t-sm);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .nav-movil-item svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; }
+  .nav-movil-item[aria-current='page'] {
+    background: var(--papel);
+    color: var(--agua-tinta);
+    border-top-color: #0E6474;
+  }
+
+  /* Las pantallas con barra inferior dejan su sitio al contenido. */
+  .principal { padding-bottom: calc(40px + var(--alto-inferior)); }
+}
+
+/* ------------------------------------------- 16.3 tarjeta de zona */
+
+.tarjeta-zona {
+  --signal: var(--sem-sin-dato);
+  --relleno: var(--sem-sin-relleno);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--papel-alto);
+  border: 2px solid #C4D0CD;
+  border-radius: 8px;
+  color: var(--tinta);
+}
+
+/* La tarjeta no crece solo por el estado: si el texto se agranda, crece con
+   él. En escritorio se reserva la altura de 250 px que tenían las pantallas. */
+@media (min-width: 900px) {
+  .tarjeta-zona { min-height: 250px; }
+}
+
+.tarjeta-zona--verde     { --signal: var(--sem-verde);     --relleno: var(--sem-verde-relleno); }
+.tarjeta-zona--ambar     { --signal: var(--sem-aviso);     --relleno: var(--sem-aviso-relleno); }
+.tarjeta-zona--rojo      { --signal: var(--sem-error);     --relleno: var(--sem-error-relleno); }
+.tarjeta-zona--sin-dato  { --signal: var(--sem-sin-dato);  --relleno: var(--sem-sin-relleno); }
+/* Grafías alternativas del archivo de datos: nadie se queda sin color. */
+.tarjeta-zona--normal    { --signal: var(--sem-verde);     --relleno: var(--sem-verde-relleno); }
+.tarjeta-zona--aviso     { --signal: var(--sem-aviso);     --relleno: var(--sem-aviso-relleno); }
+.tarjeta-zona--error     { --signal: var(--sem-error);     --relleno: var(--sem-error-relleno); }
+.tarjeta-zona--sin_dato  { --signal: var(--sem-sin-dato);  --relleno: var(--sem-sin-relleno); }
+
+.tarjeta-zona[class*='--verde'],
+.tarjeta-zona[class*='--normal'] { border-color: #14573A; }
+.tarjeta-zona[class*='--ambar'],
+.tarjeta-zona[class*='--aviso']  { border-color: #6D4004; }
+.tarjeta-zona[class*='--rojo'],
+.tarjeta-zona[class*='--error']  { border-color: #8C1D18; }
+.tarjeta-zona[class*='--sin-dato'],
+.tarjeta-zona[class*='--sin_dato'] { border-color: #3B4A52; }
+
+.tarjeta-zona__cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tarjeta-zona__nombre {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--t-enlace);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--tinta);
+  overflow-wrap: break-word;
+}
+
+.tarjeta-zona__lugar {
+  margin: 0;
+  color: var(--tinta-2);
+  font-size: var(--t-2xs);
+  line-height: var(--ti-compacto);
+}
+
+.tarjeta-zona__cifra {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--t-cifra);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.tarjeta-zona__unidad {
+  font-family: var(--sans);
+  font-size: var(--t-lg);
+  white-space: nowrap;
+}
+
+/* Cuando en lugar de la cifra va una palabra, se lee como texto. */
+.tarjeta-zona__cifra--texto {
+  font-family: var(--sans);
+  font-size: var(--t-xl);
+  line-height: 1.15;
+  color: var(--tinta-2);
+}
+
+/* ---------------------------------------- 16.4 marca de estado */
+
+/* Cuatro formas dibujadas con SVG en línea en el marcado: cuadrado (peligro),
+   triángulo (ojo), círculo (normal) y círculo con signo (sin dato). El color
+   nunca viaja solo: la palabra de al lado siempre dice cuál es. */
+.marca-estado {
+  --signal: var(--sem-sin-dato);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--signal);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: var(--ti-compacto);
+}
+
+.marca-estado svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--signal);
+  fill: currentColor;
+}
+
+.marca-estado--rojo,
+.marca-estado--error    { --signal: var(--sem-error); }
+.marca-estado--ambar,
+.marca-estado--aviso    { --signal: var(--sem-aviso); }
+.marca-estado--verde,
+.marca-estado--normal   { --signal: var(--sem-verde); }
+.marca-estado--sin-dato,
+.marca-estado--sin_dato { --signal: var(--sem-sin-dato); }
+
+/* Dentro de la tarjeta la marca lleva su relleno claro. La palabra va en
+   tinta y el SVG conserva el pigmento: así el texto cumple AAA sobre el
+   relleno, que por sí solo no llega a 7:1. */
+.tarjeta-zona .marca-estado {
+  align-self: flex-start;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--relleno);
+  color: var(--tinta);
+}
+.tarjeta-zona .marca-estado svg { color: var(--signal); }
+
+[data-estado='sin_datos'] .marca-estado,
+[data-estado='sin-datos'] .marca-estado { --signal: var(--sem-sin-dato); }
+[data-estado='al_dia'] .marca-estado,
+[data-estado='al-dia'] .marca-estado { --signal: var(--sem-verde); }
+[data-estado='atrasado'] .marca-estado,
+[data-estado='parcial'] .marca-estado { --signal: var(--sem-aviso); }
+[data-estado='error'] .marca-estado { --signal: var(--sem-error); }
+
+/* -------------------------------------------- 16.5 botones */
+
+.boton-primario,
+.boton-secundario {
+  min-height: var(--tope-tacto);
+  padding: 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: var(--ti-compacto);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.boton-primario {
+  background: var(--agua-tinta);   /* 8,42:1 con texto blanco */
+  border-color: #0B5563;
+  color: var(--blanco);
+}
+
+.boton-secundario {
+  background: var(--papel-alto);
+  border-color: #C4D0CD;
+  color: var(--tinta);
+}
+
+.boton-primario svg,
+.boton-secundario svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+@media (hover: hover) {
+  .boton-primario:hover { background: var(--pantalla); border-color: #0F242C; }
+  .boton-secundario:hover { border-color: #33424B; }
+}
+
+@media (max-width: 560px) {
+  .boton-primario,
+  .boton-secundario {
+    width: 100%;
+    min-height: 4rem;
+    font-size: var(--t-base);
+  }
+}
+
+/* ---------------------------------------- 16.6 enlace grande */
+
+.enlace-volver {
+  min-width: var(--tope-tacto);
+  min-height: var(--tope-tacto);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--agua-tinta);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.enlace-volver svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+/* `.zona-enlace` es el nombre del diseño; `.enlace-grande` es el alias
+   descriptivo. Los dos son el mismo enlace de 26 px y 56 px de alto. */
+.zona-enlace,
+.enlace-grande {
+  min-height: var(--tope-tacto);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: var(--t-enlace);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--tinta);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .enlace-volver:hover,
+  .zona-enlace:hover,
+  .enlace-grande:hover { color: var(--agua-tinta); text-decoration: underline; }
+}
+
+/* ------------------------------------------ 16.7 fila de camino */
+
+.fila-camino {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #C4D0CD;
+  color: var(--tinta-2);
+  font-size: var(--t-2xs);
+  line-height: 1.25;
+}
+
+.fila-camino--alerta  { color: var(--sem-error); font-weight: 600; }
+.fila-camino--abierto { color: var(--sem-verde); font-weight: 600; }
+
+.camino-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #C4D0CD;
+  font-size: var(--t-sm);
+}
+.camino-fila:last-child { border-bottom: 0; }
+
+/* ------------------------------------------------ 16.8 tabla */
+
+.tabla-datos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-datos caption {
+  padding-bottom: 12px;
+  color: var(--tinta-2);
+  font-size: var(--t-sm);
+  text-align: left;
+}
+
+.tabla-datos thead th {
+  padding: 12px 16px;
+  background: var(--papel-alto);
+  border-top: 1px solid #C4D0CD;
+  border-bottom: 2px solid #C4D0CD;
+  color: var(--tinta-2);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  text-align: left;
+}
+
+.tabla-datos tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #C4D0CD;
+  color: var(--tinta);
+  vertical-align: baseline;
+}
+
+.tabla-datos .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  /* El que se recorre es el contenedor con foco, no la tabla. */
+  .tabla-scroll > .tabla-datos { display: table; overflow: visible; }
+}
+
+/* ------------------------------------------------ 16.9 impresión */
+
+@media print {
+  .barra-superior,
+  .barra-inferior,
+  .boton-primario,
+  .boton-secundario,
+  .enlace-volver { display: none !important; }
+
+  .tarjeta-zona {
+    min-height: 0;
+    break-inside: avoid;
+    background: #ffffff;
+    border: 1px solid #15212A;
+  }
+  .tarjeta-zona .marca-estado { background: transparent; }
+  .tabla-datos { font-size: 13px; }
+  .tabla-datos thead th { background: #ffffff; }
+}
+
+/* ==========================================================================
+   17 · PÁGINAS DEL RECORRIDO
+
+   Armado de las diez páginas del sitio. Solo nombres nuevos; las reglas de
+   lectura fácil de las secciones anteriores siguen mandando. Los filetes y
+   espaciados van en valores literales porque el render de verificación no
+   resuelve abreviaturas con var() desde una hoja externa.
+   ========================================================================== */
+
+.titulo-pagina {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--t-2xl);
+  line-height: var(--ti-titulo);
+  color: var(--tinta);
+}
+
+/* La regla 6 del recorrido pide 56 px para todo lo tocable; esta override va
+   en la capa de páginas y no toca la sección 16. */
+@media (max-width: 720px) {
+  .barra-inferior .nav-movil-item { min-height: 56px; }
+}
+
+.bajada-pagina {
+  margin-top: 12px;
+  max-width: 66ch;
+  color: var(--tinta-2);
+  font-size: var(--t-base);
+  line-height: var(--ti-texto);
+}
+
+.bloque-pagina {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #C4D0CD;
+}
+
+.bloque-pagina h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--t-lg);
+  line-height: var(--ti-titulo);
+  color: var(--tinta);
+}
+
+.rejilla-zonas {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 24px;
+}
+@media (min-width: 700px) { .rejilla-zonas { grid-template-columns: 1fr 1fr; gap: 24px; } }
+@media (min-width: 1100px) { .rejilla-zonas { grid-template-columns: 1fr 1fr 1fr; } }
+
+.rejilla-zonas .tarjeta-zona { min-height: 0; }
+
+/* Enlaces del pie: diez destinos, todos a la vista y con 56 px de toque. */
+.enlaces-pie {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px 24px;
+  margin-top: 24px;
+  padding: 0;
+  list-style: none;
+}
+.enlaces-pie a,
+.pie__legal a {
+  min-height: 56px;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  color: var(--agua-tinta);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.campo { margin-top: 20px; }
+.campo label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--tinta-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+.campo input,
+.campo select,
+.campo textarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px;
+  border: 2px solid #C4D0CD;
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--tinta);
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+}
+.campo textarea { min-height: 120px; }
+
+.acciones-pagina {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.nota-pagina {
+  margin-top: 24px;
+  max-width: 72ch;
+  padding-left: 16px;
+  border-left: 3px solid #0E6474;
+  color: var(--tinta-2);
+  font-size: var(--t-sm);
+  line-height: var(--ti-texto);
+}
+
+.datos-lista {
+  margin: 16px 0 0;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.datos-lista > div {
+  padding: 12px 0;
+  border-bottom: 1px solid #C4D0CD;
+}
+.datos-lista dt {
+  color: var(--tinta-2);
+  font-size: var(--t-2xs);
+}
+.datos-lista dd {
+  margin: 4px 0 0;
+  color: var(--tinta);
+  font-size: var(--t-base);
+  font-weight: 600;
+}
+
+/* La fila grande del paso: un número, un nombre y el botón que lo elige. */
+.fila-paso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #C4D0CD;
+  color: var(--tinta);
+  font-size: var(--t-sm);
+}
+.fila-paso:last-child { border-bottom: 0; }
+
+/* El esquema de la ruta G-25: una línea y seis nombres, sin estado inventado. */
+.ruta {
+  margin-top: 24px;
+  padding: 24px 16px;
+  border: 2px solid #C4D0CD;
+  border-radius: 8px;
+  background: var(--papel-alto);
+}
+.ruta svg { display: block; width: 100%; height: auto; }
+.ruta text { fill: #15212A; font-family: var(--sans); font-size: 16px; }
+
+/* La pantalla de kiosco: mismos datos, letra y cifras más grandes. */
+.kiosco .titulo-pagina { font-size: var(--t-3xl); }
+.kiosco .tarjeta-zona__cifra { font-size: var(--t-cifra); }
+.kiosco .rejilla-zonas { gap: 24px; }
+
+@media print {
+  .enlaces-pie, .barra-inferior, .acciones-pagina { display: none !important; }
+}

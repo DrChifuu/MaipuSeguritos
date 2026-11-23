@@ -12,6 +12,7 @@
 <script src="datos/registros.js" defer></script>
 <script src="datos/historicos.js" defer></script>
 <script src="assets/app.js" defer></script>
+<script src="assets/paginas.js" defer></script>
 </head>
 <body>
 
@@ -90,6 +91,17 @@
     </div>
   </section>
 
+  <!-- Las seis zonas, con la misma ficha que usan las páginas portadas. Las
+       arman los datos/estaciones.js con assets/paginas.js, sin pedir nada
+       a la red. Va después del tablero para no correr las tarjetas de arriba. -->
+  <section class="bloque-pagina" aria-labelledby="zonas-titulo">
+    <div class="contenido">
+      <h2 class="titulo-pagina" id="zonas-titulo" style="font-size:1.5rem">Las seis zonas</h2>
+      <p class="bajada-pagina">Cada ficha dice si hay medición y si alguien informó el acceso. El detalle de cada punto está en su propia página.</p>
+      <div class="rejilla-zonas" data-estaciones><!-- lo llena paginas.js --></div>
+    </div>
+  </section>
+
   <!-- 00b Cómo leer el tablero: las tres lecturas al revés que hay que evitar.
        Va visible, no detrás de un clic; el enlace de la cuenta del tablero
        lleva acá desde la primera pantalla. -->
@@ -114,6 +126,15 @@
         <li><strong>Este tablero no emite alertas.</strong> No reemplaza a los organismos
           oficiales.</li>
       </ul>
+
+      <h3 class="tabla__titulo" style="font-family:var(--serif);font-size:1.125rem;margin-top:1.5rem">Leyenda de los cuatro estados</h3>
+      <ul class="como-leer__lista">
+        <li><span class="marca-estado marca-estado--verde"><svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="currentColor"/></svg><span>Normal</span></span> · círculo verde: menos de 5 mm en una hora.</li>
+        <li><span class="marca-estado marca-estado--ambar"><svg viewBox="0 0 18 18" aria-hidden="true"><polygon points="9,1 17,16 1,16" fill="currentColor"/></svg><span>Ojo</span></span> · triángulo ámbar: 5 mm o más en una hora, o 15 mm o más en tres horas.</li>
+        <li><span class="marca-estado marca-estado--rojo"><svg viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="1" width="16" height="16" fill="currentColor"/></svg><span>Peligro</span></span> · cuadrado rojo: 15 mm o más en una hora, o 30 mm o más en tres horas.</li>
+        <li><span class="marca-estado marca-estado--sin-dato"><svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="currentColor"/><text x="9" y="13" text-anchor="middle" font-size="12" font-weight="600" fill="#E2E6E5">?</text></svg><span>Sin dato</span></span> · círculo gris con signo: el equipo no ha enviado datos.</li>
+      </ul>
+      <p style="font-size:1rem;margin-top:1rem">Umbrales provisionales. Se van a acordar con SERNAGEOMIN.</p>
     </div>
   </section>
 
@@ -123,8 +144,8 @@
     <div class="contenido">
 
       <p class="rotulo">
-        <span class="rotulo__marca">Datos simulados para prueba</span>
-        <span>No corresponden a una medición real.</span>
+        <span class="rotulo__marca" id="origen-datos">Comprobando el origen de los datos…</span>
+        <span id="origen-detalle">—</span>
       </p>
 
       <div class="panel__cabeza">
@@ -355,7 +376,7 @@
       <p class="seccion__numero">Qué se está viendo</p>
       <h2>Estado del dato</h2>
       <p class="entrada">
-        Esta página no recibe mediciones en vivo: es una copia estática de la última
+        Esta página no recibe mediciones nuevas: es una copia estática de la última
         publicación del registro. Lo que sigue dice cuándo se actualizó ese archivo y si el
         dato está al día o atrasado.
       </p>
@@ -528,10 +549,7 @@
       </div>
       <div>
         <p class="pie__titulo">Estos datos</p>
-        <p class="pie__texto">
-          Copia estática de la última publicación; no recibe mediciones en vivo. Datos
-          simulados para prueba.
-        </p>
+        <p class="pie__texto" id="modo-datos">Comprobando el origen de los datos…</p>
       </div>
       <div>
         <p class="pie__titulo">Cómo se abrió</p>
@@ -540,6 +558,19 @@
         </p>
       </div>
     </div>
+    <p class="pie__titulo">Todas las páginas</p>
+    <ul class="enlaces-pie">
+      <li><a href="index.html">Ahora</a></li>
+      <li><a href="zona.html">Detalle de una zona</a></li>
+      <li><a href="registrar.html">Registrar una lectura</a></li>
+      <li><a href="avisar.html">Avisar algo</a></li>
+      <li><a href="historial.html">Historial de archivos</a></li>
+      <li><a href="archivo.html">Archivo abierto</a></li>
+      <li><a href="camino.html">El camino de hoy</a></li>
+      <li><a href="ayuda.html">Cómo leer el tablero</a></li>
+      <li><a href="kiosco.html">Pantalla de kiosco</a></li>
+      <li><a href="observadores.html">Padrón de observadores</a></li>
+    </ul>
     <p class="pie__legal">
       Última publicación: <span id="pie-actualizado">—</span>. Este panel no emite alertas y
       no reemplaza a los organismos oficiales.
@@ -567,6 +598,34 @@
       'tabla, el gráfico y las descargas no se pueden armar.';
     if (error) error.hidden = false;
   }, 3000);
+</script>
+
+<script>
+  /* El rótulo del origen de los datos no puede quedar fijo: cambia según lo
+     que el publicador dejó en datos/registros.js. No pide nada a la red. */
+  document.addEventListener('DOMContentLoaded', function () {
+    var metros = window.REGISTROS || {};
+    var rotulo, detalle, modo;
+    if (typeof metros.label === 'string' && /simulad|ficticia/i.test(metros.label)) {
+      rotulo = 'Datos de prueba simulados';
+      detalle = 'No corresponden a una medición real.';
+      modo = rotulo;
+    } else if (metros.generated_at || metros.published_at) {
+      rotulo = 'Datos publicados desde la estación · muestra la hora de publicación y que no es alerta oficial';
+      detalle = 'Muestra la hora de publicación del archivo publicado.';
+      modo = rotulo;
+    } else {
+      rotulo = 'Origen de los datos no declarado en el archivo publicado';
+      detalle = 'No se puede afirmar de dónde vienen los datos.';
+      modo = rotulo;
+    }
+    var nodo = document.getElementById('origen-datos');
+    if (nodo) nodo.textContent = rotulo;
+    nodo = document.getElementById('origen-detalle');
+    if (nodo) nodo.textContent = detalle;
+    nodo = document.getElementById('modo-datos');
+    if (nodo) nodo.textContent = modo;
+  });
 </script>
 
 </body>
