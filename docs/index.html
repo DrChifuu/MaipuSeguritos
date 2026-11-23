@@ -1,632 +1,93 @@
 <!DOCTYPE html>
 <html lang="es-CL">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light">
-<meta name="description" content="Tablero de los puntos de medición del Cajón del Maipo: última lectura de lluvia, acumulado de 24 h, estado del dato y estado de acceso de cada lugar. Un punto con lecturas de prueba simuladas y cinco puntos propuestos.">
-<title>Maipo Vigía · tablero de estaciones del Cajón del Maipo</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 32'%3E%3Crect x='6' y='2' width='12' height='28' rx='6' fill='none' stroke='%230E6C7C' stroke-width='2'/%3E%3Cpath d='M8 20h8v8a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z' fill='%230E6C7C'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/estilos.css">
-<script src="datos/estaciones.js" defer></script>
-<script src="datos/registros.js" defer></script>
-<script src="datos/historicos.js" defer></script>
-<script src="assets/app.js" defer></script>
-<script src="assets/paginas.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Maipo Vigía: lluvia medida por la comunidad y estado de los caminos del Cajón del Maipo. Tablero comunitario, registro de observadores y archivos históricos." />
+  <meta name="color-scheme" content="light" />
+  <title>Maipo Vigía — Lluvia y caminos en el Cajón del Maipo</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5C12 2.5 6 9.5 6 14a6 6 0 0 0 12 0c0-4.5-6-11.5-6-11.5Z' fill='none' stroke='%230E6474' stroke-width='2'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="assets/maipo.css" />
+  <script src="datos/config.js" defer></script>
+  <script src="datos/semilla.js" defer></script>
+  <script src="assets/almacen.js" defer></script>
+  <script src="assets/maipo.js" defer></script>
 </head>
 <body>
+  <div class="app-shell" id="appShell">
+    <!-- BARRA SUPERIOR -->
+    <header class="topbar" role="banner">
+      <div class="topbar-left">
+        <button type="button" class="brand-mark" id="brandBtn" aria-label="Maipo Vigía, ir a Ahora">
+          <svg class="icon-24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M12 2.5C12 2.5 6 9.5 6 14a6 6 0 0 0 12 0c0-4.5-6-11.5-6-11.5Z"/>
+            <path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/>
+          </svg>
+          <span>Maipo Vigía</span>
+        </button>
+        <span class="topbar-updated" id="topbarUpdated">Actualizado hoy a las 09:42</span>
+        <span class="topbar-mobile-status" id="topbarMobileStatus"></span>
+      </div>
+      <div class="topbar-right">
+        <button type="button" class="topbar-btn" id="btnFontToggle" aria-pressed="false" aria-label="Agrandar letra">A+</button>
+        <div class="desktop-session-wrap" id="desktopSessionWrap"></div>
+      </div>
+    </header>
 
-<a class="salto" href="#tablero">Ir al tablero</a>
+    <!-- NIVEL 1: BARRA DE PESTAÑAS (ESCRITORIO) -->
+    <nav class="tabbar" id="desktopTabbar" role="tablist" aria-label="Secciones principales"></nav>
 
-<!-- La regla: índice de secciones con forma de tubo de precipitación -->
-<nav class="regla" aria-label="Secciones">
-  <div class="regla__tubo">
-    <div class="regla__agua" id="agua"></div>
-    <ol class="regla__marcas">
-      <li><a href="#tablero" data-marca="tablero" aria-current="location"><span>Tablero</span></a></li>
-      <li><a href="#datos" data-marca="datos"><span>Datos</span></a></li>
-      <li><a href="#registro" data-marca="registro"><span>Registro</span></a></li>
-      <li><a href="#estado" data-marca="estado"><span>Estado</span></a></li>
-      <li><a href="#instrumento" data-marca="instrumento"><span>Instrumento</span></a></li>
-      <li><a href="#formato" data-marca="formato"><span>Formato</span></a></li>
-      <li><a href="#historicos" data-marca="historicos"><span>Históricos</span></a></li>
-    </ol>
+    <!-- NIVEL 2: SOLAPAS -->
+    <nav class="subtabbar" id="subtabbar" role="tablist" aria-label="Solapas de sección"></nav>
+
+    <!-- CONTENIDO PRINCIPAL (ÚNICO SCROLL INTERNO) -->
+    <main class="main-panel" id="mainPanel" tabindex="-1">
+      <div class="content-container" id="mainContent"></div>
+    </main>
+
+    <!-- PIE DE ESCRITORIO -->
+    <footer class="footerbar" role="contentinfo">
+      <div class="footer-left">
+        <span>El semáforo es apoyo comunitario, no alerta oficial.</span>
+        <span class="demo-tag" id="demoTag">Datos de ejemplo</span>
+      </div>
+      <div class="footer-right">
+        <button type="button" class="footer-link" id="btnFooterHelp">Cómo leer</button>
+        <button type="button" class="footer-link" id="btnFooterKiosco">Kiosco</button>
+      </div>
+    </footer>
+
+    <!-- BARRA INFERIOR MÓVIL (5 BOTONES SEGÚN ROL) -->
+    <nav class="bottombar" id="mobileBottombar" aria-label="Navegación móvil"></nav>
   </div>
-</nav>
 
-<header class="cabecera">
-  <div class="contenido cabecera__fila">
-    <a class="marca" href="#datos">
-      <svg class="marca__icono" viewBox="0 0 24 32" aria-hidden="true">
-        <rect x="6" y="2" width="12" height="28" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
-        <path d="M8 20h8v8a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z" fill="currentColor"/>
-      </svg>
-      <span class="marca__texto">
-        <strong>Maipo Vigía</strong>
-        <span>Pluviómetros del Cajón del Maipo</span>
-      </span>
-    </a>
-    <p class="cabecera__curso">Seis puntos: uno con datos, cinco propuestos</p>
+  <!-- NIVEL 3: HOJA LATERAL (480px ESCRITORIO / PANTALLA COMPLETA MÓVIL) -->
+  <div class="sheet-backdrop hidden" id="sheetBackdrop" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-panel" id="sheetPanel">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="sheetTitle">Panel</h2>
+        <button type="button" class="topbar-btn" id="btnCloseSheet" aria-label="Cerrar panel">Cerrar</button>
+      </div>
+      <div class="sheet-body" id="sheetBody"></div>
+    </div>
   </div>
-</header>
 
-<main>
-
-  <!-- 00 El tablero: lo primero que se ve. Una tarjeta por punto de medición,
-       con el estado del dato y el estado de acceso del lugar. Las tarjetas las
-       arma app.js desde datos/estaciones.js, que trae el modelo completo. -->
-  <section class="tablero" id="tablero" aria-labelledby="tablero-titulo">
-    <div class="contenido">
-      <div class="tablero__cabeza">
-        <h1 class="tablero__titulo" id="tablero-titulo">Los puntos del Cajón del Maipo</h1>
-        <p class="tablero__bajada">
-          Cinco de los seis puntos son propuestos, sin sensor ni lecturas. El primero
-          tiene lecturas de prueba simuladas.
-        </p>
-        <p class="tablero__cuenta" id="tablero-cuenta">Leyendo el archivo de puntos…</p>
-      </div>
-
-      <div class="tablero__rejilla" id="tablero-rejilla" role="list" aria-label="Puntos del Cajón del Maipo"><!-- lo llena app.js --></div>
-
-      <noscript>
-        <div class="estado estado--error">
-          <p class="estado__titulo">El tablero necesita JavaScript local</p>
-          <p class="estado__texto">
-            Las tarjetas de los puntos las arma <code>assets/app.js</code> desde
-            <code>datos/estaciones.js</code>, y esa lectura no pide nada a la red. Sin
-            JavaScript no se puede mostrar la rejilla; los textos de las secciones se leen
-            igual.
-          </p>
-        </div>
-      </noscript>
-
-      <div class="estado estado--error" id="tablero-error" role="alert" hidden>
-        <p class="estado__titulo">No se pudo leer el archivo de puntos</p>
-        <p class="estado__texto" id="tablero-error-motivo">—</p>
-        <p class="estado__pie">
-          Se esperaba el archivo <code>datos/estaciones.js</code>, al lado de esta página.
-          Sin él no hay tarjetas que mostrar; el detalle del registro sigue abajo.
-        </p>
-      </div>
+  <!-- MODO KIOSCO (1920×1080) -->
+  <section class="kiosco-overlay hidden" id="kioscoOverlay" aria-label="Modo Kiosco">
+    <div class="kiosco-top">
+      <button type="button" class="kiosco-brand" id="kioscoBrandExit" title="Cinco toques para salir">Maipo Vigía</button>
+      <div id="kioscoTopInfo" style="font-size: 24px; color: var(--pantalla-suave);"></div>
+    </div>
+    <div class="kiosco-grid" id="kioscoGrid"></div>
+    <div class="kiosco-foot">
+      <span id="kioscoClock"></span>
+      <span>Datos de ejemplo · El semáforo es apoyo comunitario, no alerta oficial</span>
     </div>
   </section>
 
-  <!-- Las seis zonas, con la misma ficha que usan las páginas portadas. Las
-       arman los datos/estaciones.js con assets/paginas.js, sin pedir nada
-       a la red. Va después del tablero para no correr las tarjetas de arriba. -->
-  <section class="bloque-pagina" aria-labelledby="zonas-titulo">
-    <div class="contenido">
-      <h2 class="titulo-pagina" id="zonas-titulo" style="font-size:1.5rem">Las seis zonas</h2>
-      <p class="bajada-pagina">Cada ficha dice si hay medición y si alguien informó el acceso. El detalle de cada punto está en su propia página.</p>
-      <div class="rejilla-zonas" data-estaciones><!-- lo llena paginas.js --></div>
-    </div>
-  </section>
+  <!-- MENSAJE EMERGENTE ACCESIBLE (REEMPLAZA alert()) -->
+  <div class="toast-box hidden" id="toastBox" role="status" aria-live="polite"></div>
 
-  <!-- 00b Cómo leer el tablero: las tres lecturas al revés que hay que evitar.
-       Va visible, no detrás de un clic; el enlace de la cuenta del tablero
-       lleva acá desde la primera pantalla. -->
-  <section class="como-leer" id="como-leer" aria-labelledby="como-leer-titulo">
-    <div class="contenido">
-      <h2 class="como-leer__titulo" id="como-leer-titulo">Cómo leer este tablero</h2>
-      <ul class="como-leer__lista">
-        <li><strong>«Sin datos» no es «no llovió».</strong> Significa que ese punto no ha
-          enviado su medición. Puede estar lloviendo sin que lo sepamos.</li>
-        <li><strong>Un cero sí es una medición.</strong> 0,0 mm quiere decir que el
-          pluviómetro midió y no juntó agua.</li>
-        <li><strong>«Acceso sin información» no significa camino abierto.</strong>
-          Significa que nadie ha informado cómo está el camino: puede estar abierto o
-          cerrado.</li>
-        <li><strong>El acceso lo informa una persona, con fecha y hora.</strong> No se
-          deduce del clima ni de la falta de datos.</li>
-        <li><strong>La hora de la medición no es la hora de publicación.</strong> La
-          tarjeta dice cuándo midió; la cuenta del tablero y el detalle, cuándo se publicó.</li>
-        <li><strong>«Punto propuesto» no es una estación instalada ni una quebrada
-          priorizada por una institución.</strong> Es un lugar que el proyecto propone
-          medir y todavía no tiene sensor.</li>
-        <li><strong>Este tablero no emite alertas.</strong> No reemplaza a los organismos
-          oficiales.</li>
-      </ul>
-
-      <h3 class="tabla__titulo" style="font-family:var(--serif);font-size:1.125rem;margin-top:1.5rem">Leyenda de los cuatro estados</h3>
-      <ul class="como-leer__lista">
-        <li><span class="marca-estado marca-estado--verde"><svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="currentColor"/></svg><span>Normal</span></span> · círculo verde: menos de 5 mm en una hora.</li>
-        <li><span class="marca-estado marca-estado--ambar"><svg viewBox="0 0 18 18" aria-hidden="true"><polygon points="9,1 17,16 1,16" fill="currentColor"/></svg><span>Ojo</span></span> · triángulo ámbar: 5 mm o más en una hora, o 15 mm o más en tres horas.</li>
-        <li><span class="marca-estado marca-estado--rojo"><svg viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="1" width="16" height="16" fill="currentColor"/></svg><span>Peligro</span></span> · cuadrado rojo: 15 mm o más en una hora, o 30 mm o más en tres horas.</li>
-        <li><span class="marca-estado marca-estado--sin-dato"><svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="currentColor"/><text x="9" y="13" text-anchor="middle" font-size="12" font-weight="600" fill="#E2E6E5">?</text></svg><span>Sin dato</span></span> · círculo gris con signo: el equipo no ha enviado datos.</li>
-      </ul>
-      <p style="font-size:1rem;margin-top:1rem">Umbrales provisionales. Se van a acordar con SERNAGEOMIN.</p>
-    </div>
-  </section>
-
-  <!-- 01 El dato: el detalle del punto seleccionado, debajo del tablero -->
-
-  <section class="panel" id="datos" aria-labelledby="datos-titulo">
-    <div class="contenido">
-
-      <p class="rotulo">
-        <span class="rotulo__marca" id="origen-datos">Comprobando el origen de los datos…</span>
-        <span id="origen-detalle">—</span>
-      </p>
-
-      <div class="panel__cabeza">
-        <div>
-          <h2 class="panel__titulo" id="datos-titulo">El detalle del punto seleccionado</h2>
-          <p class="panel__sub" id="estacion-detalle">—</p>
-        </div>
-      </div>
-
-      <!-- El punto del detalle: se elige con botones, no hace falta JavaScript
-           para leer el nombre de cada uno. El de arriba es el que trae lecturas. -->
-      <p class="detalle__rotulo" id="detalle-selector-rotulo">Elegir el punto del detalle</p>
-      <div class="detalle__selector" id="detalle-selector" role="group" aria-labelledby="detalle-selector-rotulo"><!-- lo llena app.js --></div>
-      <p class="detalle__viendo" id="detalle-viendo" role="status" aria-live="polite">Leyendo el punto del detalle…</p>
-      <div class="detalle__estados" id="detalle-estados"><!-- lo llena app.js --></div>
-
-      <div class="estado estado--vacio" id="detalle-vacio" role="status" aria-live="polite" hidden>
-        <p class="estado__titulo" id="detalle-vacio-titulo">Este punto no tiene lecturas</p>
-        <p class="estado__texto" id="detalle-vacio-texto">—</p>
-      </div>
-
-      <!-- El dato al frente del punto seleccionado: cuánto llovió en la última
-           lectura, de cuándo es y cuánto suma la ventana de 24 h. -->
-      <div id="detalle-cifras">
-        <div class="hero-dato" id="hero">
-          <div class="hero-dato__principal">
-            <p class="hero-dato__rotulo">Última lectura del sensor</p>
-            <p class="hero-dato__valor cifra" id="h-ultima">—</p>
-            <p class="hero-dato__detalle" id="h-ultima-detalle">—</p>
-          </div>
-          <div class="hero-dato__item" id="item-estado-dato">
-            <p class="hero-dato__item-rotulo">Estado del dato</p>
-            <p class="hero-dato__item-valor" id="h-estado">—</p>
-            <p class="hero-dato__item-nota" id="h-estado-nota">—</p>
-          </div>
-          <div class="hero-dato__item" id="item-24h-hero">
-            <p class="hero-dato__item-rotulo">Acumulado de 24 h</p>
-            <p class="hero-dato__item-valor cifra" id="h-acumulado">—</p>
-            <p class="hero-dato__item-nota" id="h-acumulado-nota">—</p>
-          </div>
-        </div>
-
-        <p class="hero-dato__respuesta" id="h-respuesta">—</p>
-        <p class="hero-dato__copia" id="h-copia">—</p>
-        <p class="hero-dato__marco">
-          Datos de prueba con el formato que usará la red de pluviómetros del Cajón del Maipo.
-          Cinco de los seis puntos están propuestos y todavía no tienen sensor instalado: esta
-          página no es una red instalada.
-        </p>
-      </div>
-
-      <!-- Carga en curso: el bloque está en el marcado antes de que lleguen los
-           datos, no después del error. app.js lo retira cuando termina. -->
-      <div class="estado estado--cargando" id="estado-carga" role="status">
-        <p class="estado__titulo">Cargando el registro</p>
-        <p class="estado__texto">
-          Se está leyendo el archivo de datos que está en esta misma carpeta. Mientras
-          tanto no se adelanta ninguna cifra.
-        </p>
-        <p class="estado__barra"></p>
-      </div>
-
-      <noscript>
-        <div class="estado estado--error">
-          <p class="estado__titulo">Esta página necesita JavaScript local para el registro</p>
-          <p class="estado__texto">
-            La tabla, el gráfico y las descargas los arma <code>assets/app.js</code>, que se
-            carga desde esta misma carpeta y no pide nada a la red. Sin él, el texto de las
-            secciones se lee igual, pero el registro no se arma. No es un problema de
-            conexión.
-          </p>
-        </div>
-      </noscript>
-
-      <!-- Error de carga: se muestra cuando el archivo de datos no llegó o no
-           tiene la forma que define panel-web/datos/formato_panel.py. -->
-      <div class="estado estado--error" id="estado-error" role="alert" hidden>
-        <p class="estado__titulo">El registro no se pudo leer</p>
-        <p class="estado__texto" id="estado-error-motivo">—</p>
-        <p class="estado__pie">
-          Se esperaba el archivo <code>datos/registros.js</code>, al lado de esta página. No
-          se pone una cifra en su lugar: sin dato no es cero.
-        </p>
-      </div>
-
-      <div class="estado estado--vacio" id="estado-vacio" role="status" aria-live="polite" hidden>
-        <p class="estado__titulo">Sin datos en el período</p>
-        <p class="estado__texto" id="estado-vacio-texto">—</p>
-      </div>
-
-      <div class="estado estado--vacio" id="estado-sin-sensor" role="status" aria-live="polite" hidden>
-        <p class="estado__titulo">Sin lecturas del sensor en este archivo</p>
-        <p class="estado__texto">
-          El archivo solo trae lecturas del lector manual. Con eso no se calcula acumulado,
-          intensidad ni gráfico: las filas se muestran tal como vienen, y nada más. Tampoco
-          se rellenan con cero.
-        </p>
-      </div>
-
-      <div class="estado estado--error" id="estado-puntos" role="status" aria-live="polite" hidden>
-        <p class="estado__titulo">El archivo mezcla puntos</p>
-        <p class="estado__texto" id="estado-puntos-texto">—</p>
-        <p class="estado__pie">
-          Los registros de puntos distintos no se suman entre sí: un acumulado así no
-          corresponde a ningún pluviómetro.
-        </p>
-      </div>
-
-      <div class="estado estado--error" id="estado-rechazos" role="status" aria-live="polite" hidden>
-        <p class="estado__titulo">Registros fuera del contrato</p>
-        <p class="estado__texto" id="estado-rechazos-texto">—</p>
-        <p class="estado__pie">
-          Un registro que no trae las siete claves del firmware, o que las trae con otro
-          tipo, no se muestra ni se completa a mano.
-        </p>
-      </div>
-
-      <!-- Los datos los arma app.js: hasta entonces el bloque no se muestra,
-           para no enseñar una ficha de guiones largos como si fuera un dato. -->
-      <div id="panel-datos" hidden>
-        <div id="registro">
-
-          <dl class="ficha-larga" aria-label="Ficha de la lectura">
-            <div><dt>Punto</dt><dd id="f-punto">—</dd></div>
-            <div><dt>Unidad</dt><dd id="f-unidad">—</dd></div>
-            <div><dt>Período</dt><dd id="f-periodo">—</dd></div>
-            <div><dt>Fuente</dt><dd id="f-fuente">—</dd></div>
-            <div><dt>Publicación del archivo</dt><dd id="f-publicacion">—</dd></div>
-          </dl>
-
-          <figure class="grafico" id="grafico-caja">
-            <figcaption class="grafico__leyenda">
-              <span class="llave llave--barra">Lluvia de cada registro del sensor (mm, eje izquierdo)</span>
-              <span class="llave llave--linea">Acumulado del tramo, que se reinicia al vaciar (mm, eje derecho)</span>
-            </figcaption>
-            <p class="grafico__eventos" id="grafico-eventos" hidden></p>
-            <div id="lienzo" class="grafico__lienzo" role="img" aria-label="Gráfico del registro de lluvia"></div>
-          </figure>
-
-          <div class="cifras" id="cifras">
-            <div class="cifras__item" id="item-acumulado">
-              <p class="cifras__rotulo">Acumulado de 24 h</p>
-              <p class="cifras__valor cifra" id="c-acumulado">—</p>
-              <p class="cifras__nota" id="c-acumulado-nota">—</p>
-            </div>
-            <div class="cifras__item" id="item-total">
-              <p class="cifras__rotulo">Total del archivo</p>
-              <p class="cifras__valor cifra" id="c-total">—</p>
-              <p class="cifras__nota" id="c-total-nota">—</p>
-            </div>
-            <div class="cifras__item" id="item-intensidad">
-              <p class="cifras__rotulo">Intensidad media del período</p>
-              <p class="cifras__valor cifra" id="c-intensidad">—</p>
-              <p class="cifras__nota" id="c-intensidad-nota">—</p>
-            </div>
-            <div class="cifras__item" id="item-corte">
-              <p class="cifras__rotulo">Desde el vaciado del tubo</p>
-              <p class="cifras__valor cifra" id="c-desde-corte">—</p>
-              <p class="cifras__nota" id="c-desde-corte-nota">—</p>
-            </div>
-            <div class="cifras__item cifras__item--ancho" id="item-manual">
-              <p class="cifras__rotulo">Comparación con el pluviómetro manual</p>
-              <p class="cifras__valor cifra" id="c-manual">—</p>
-              <p class="cifras__nota" id="c-manual-nota">—</p>
-            </div>
-          </div>
-
-          <div class="estado estado--parcial" id="estado-periodo" role="status" aria-live="polite" hidden>
-            <p class="estado__titulo">Período incompleto</p>
-            <p class="estado__texto" id="estado-periodo-texto">—</p>
-            <p class="estado__pie" id="estado-periodo-pie">—</p>
-          </div>
-
-          <div class="acciones">
-            <div class="acciones__canal" role="group" aria-label="Filtrar las filas por canal">
-              <button type="button" class="boton boton--suave" data-filtro-canal="todo" aria-pressed="true" aria-controls="tabla-registro">Todo</button>
-              <button type="button" class="boton boton--suave" data-filtro-canal="automatico" aria-pressed="false" aria-controls="tabla-registro">Sensor</button>
-              <button type="button" class="boton boton--suave" data-filtro-canal="manual" aria-pressed="false" aria-controls="tabla-registro">Lector manual</button>
-            </div>
-            <div class="acciones__punto" id="filtro-punto" role="group" aria-label="Filtrar las filas por punto"></div>
-            <div class="acciones__descargas">
-              <button type="button" class="boton" id="btn-csv">Descargar CSV</button>
-              <button type="button" class="boton" id="btn-json">Descargar JSON</button>
-            </div>
-          </div>
-
-          <p class="panel__pie" id="filtro-estado" role="status">—</p>
-
-          <p class="panel__pie" id="panel-pie">—</p>
-
-          <div class="tabla-scroll" role="region" aria-label="Registro del evento: tabla que se recorre de lado" tabindex="0">
-            <table class="tabla" id="tabla-registro">
-              <caption class="tabla__titulo">Registro del evento, fila por fila. Punto: el <code>station_id</code> de cada fila y, cuando aparece un punto nuevo, su sector aproximado tal como lo declara el archivo. Canal: <code>automatico</code> es el sensor; <code>manual</code>, la lectura del observador.</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Hora de medición</th>
-                  <th scope="col" class="num">Lluvia (mm)</th>
-                  <th scope="col" class="num">Acumulado del tramo (mm)</th>
-                  <th scope="col" class="num">Temperatura (°C)</th>
-                  <th scope="col">Punto</th>
-                  <th scope="col">Canal</th>
-                  <th scope="col">Revisión</th>
-                  <th scope="col">Publicado</th>
-                </tr>
-              </thead>
-              <tbody><!-- lo llena app.js --></tbody>
-            </table>
-          </div>
-
-          <ul class="reglas">
-            <li>La hora de medición y la hora de publicación son distintas, y se muestran las dos.</li>
-            <li>El acumulado del tramo se reinicia cuando se vacía el tubo, y el vaciado queda marcado en su fila.</li>
-            <li>Un registro sin revisar se marca sin revisar. No se esconde ni se descarta.</li>
-            <li>Un período incompleto no se anuncia como acumulado completo: la ventana de 24 h se informa con lo que la serie cubre.</li>
-            <li>La intensidad es un promedio del período del archivo, no la intensidad de un intervalo.</li>
-            <li>El intervalo de 10 minutos lo declara el archivo, no el sketch: el de referencia emite un registro por pulsación, sin temporizador ni sueño entre mediciones.</li>
-          </ul>
-
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- 02 Estado del dato -->
-  <section class="seccion" id="estado">
-    <div class="contenido">
-      <p class="seccion__numero">Qué se está viendo</p>
-      <h2>Estado del dato</h2>
-      <p class="entrada">
-        Esta página no recibe mediciones nuevas: es una copia estática de la última
-        publicación del registro. Lo que sigue dice cuándo se actualizó ese archivo y si el
-        dato está al día o atrasado.
-      </p>
-
-      <table class="tabla tabla--estado">
-        <caption class="tabla__titulo">Fechas y estado del registro publicado</caption>
-        <tbody>
-          <tr><th scope="row">Última publicación</th><td id="e-publicacion">—</td></tr>
-          <tr><th scope="row">Archivo generado</th><td id="e-generado">—</td></tr>
-          <tr><th scope="row">Antigüedad</th><td id="e-antiguedad">—</td></tr>
-          <tr><th scope="row">Enlace con una estación</th><td>Ninguno. El archivo se publica a mano; no hay recepción automática de mediciones.</td></tr>
-          <tr><th scope="row">Calibración</th><td>Pendiente. No hay mediciones calibradas del sensor: las cifras de esta copia son simuladas.</td></tr>
-          <tr><th scope="row">Qué significa «atrasado»</th><td>La última publicación tiene más de seis horas. El registro sigue siendo válido como archivo, pero no describe la lluvia de ahora.</td></tr>
-        </tbody>
-      </table>
-
-      <p class="cierre" id="e-cierre">—</p>
-    </div>
-  </section>
-
-  <!-- 03 Instrumento -->
-  <section class="seccion" id="instrumento">
-    <div class="contenido">
-      <p class="seccion__numero">Cómo mide</p>
-      <h2>El instrumento</h2>
-      <p class="entrada">
-        Un embudo recoge la lluvia y la lleva a un tubo. El agua sube, y un sensor ultrasónico
-        mide a qué altura está. El resto es aritmética y relojes. Estas son las medidas del
-        diseño y de qué depende la lectura.
-      </p>
-
-      <dl class="medidas">
-        <div><dt>Diámetro del embudo</dt><dd>14 cm</dd></div>
-        <div><dt>Área de captación</dt><dd>154 cm²</dd></div>
-        <div><dt>Volumen por milímetro de lluvia</dt><dd>15,4 mL</dd></div>
-        <div><dt>Diámetro del tubo</dt><dd>75 mm <span>interior cercano a 7,1 cm, por medir</span></dd></div>
-        <div><dt>Subida del agua por milímetro de lluvia</dt><dd>3,9 mm <span>relación de áreas 3,9:1, por medir</span></dd></div>
-        <div><dt>Resolución teórica del conjunto</dt><dd>0,26 mm <span>con resolución de sensor cercana a 1 mm; calculada, no medida</span></dd></div>
-        <div><dt>Valor de la demo del sketch (0,2 mm por evento)</dt><dd>0,2 mm <span>constante de simulación, no una medición</span></dd></div>
-      </dl>
-
-      <figure class="lamina">
-        <img src="img/diseno_conceptual.jpg" width="1100" height="634"
-             alt="Esquema del instrumento: embudo con malla, tubo, sensor ultrasónico bajo la tapa, caja estanca, panel solar y antena.">
-        <figcaption>
-          Diseño conceptual del instrumento. Es un dibujo de lo que se quiere construir, no
-          una foto del prototipo: no existe todavía. La relación de áreas de 3,9:1 se calculó
-          con un diámetro interior de tubo cercano a 7,1 cm que está por medir; esta página
-          usa esa misma relación y no la da por medida.
-        </figcaption>
-      </figure>
-
-      <p class="nota">
-        El enlace de radio y la calibración están pendientes: el registro que se publica en
-        esta copia lo genera el simulador con el mismo formato que usará la estación. Por eso
-        ninguna cifra de esta página es una medición real.
-      </p>
-    </div>
-  </section>
-
-  <!-- 04 Formato -->
-  <section class="seccion" id="formato">
-    <div class="contenido">
-      <p class="seccion__numero">Qué se guarda</p>
-      <h2>El formato del registro</h2>
-      <p class="entrada">
-        Todo registro guarda lo mismo, venga del sensor o del observador. Son los campos con
-        los que se puede leer el CSV y el JSON que se descargan más arriba.
-      </p>
-
-      <table class="tabla tabla--campos">
-        <caption class="tabla__titulo">Los siete campos que graba el dispositivo</caption>
-        <thead>
-          <tr><th scope="col">Campo</th><th scope="col">Tipo</th><th scope="col">Ejemplo</th><th scope="col">Para qué</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>id</code></td><td>texto</td><td>MV-SJM-0001</td><td>Identificar el registro. Lo emite el dispositivo y no es único entre reinicios: el simulador le pone la fecha, <code>MV-20261114-0016</code></td></tr>
-          <tr><td><code>station_id</code></td><td>texto</td><td>SJM-PLAZA-01</td><td>De qué punto viene</td></tr>
-          <tr><td><code>timestamp</code></td><td>ISO 8601 con zona</td><td>2026-11-14T20:30:00-03:00</td><td>Cuándo se midió. Sin desfase horario, el registro no entra</td></tr>
-          <tr><td><code>rainfall_mm</code></td><td>número</td><td>1.6</td><td>Cuánta lluvia trae el registro. Nunca vacío ni negativo</td></tr>
-          <tr><td><code>temperature_c</code></td><td>número o vacío</td><td>14.2</td><td>Corrección y contexto. Puede venir vacío y se muestra vacío</td></tr>
-          <tr><td><code>source</code></td><td>automatico o manual</td><td>automatico</td><td>Quién midió. El dispositivo siempre dice <code>automatico</code></td></tr>
-          <tr><td><code>verified</code></td><td>true o false</td><td>false</td><td>Si alguien ya lo revisó. El dispositivo siempre dice <code>false</code></td></tr>
-        </tbody>
-      </table>
-
-      <table class="tabla tabla--campos">
-        <caption class="tabla__titulo">Los cuatro que agrega la copia publicada</caption>
-        <thead>
-          <tr><th scope="col">Campo</th><th scope="col">Tipo</th><th scope="col">Ejemplo</th><th scope="col">Para qué</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><code>published_at</code></td><td>ISO 8601 con zona</td><td>2026-11-14T22:41:00-03:00</td><td>Cuándo se publicó, distinto de cuándo se midió</td></tr>
-          <tr><td><code>estado</code></td><td>texto</td><td>simulado</td><td>La condición del dato. No es el canal: el canal es <code>source</code></td></tr>
-          <tr><td><code>tube_empty</code></td><td>true o false</td><td>false</td><td>Si el tubo se vació en ese intervalo</td></tr>
-          <tr><td><code>note</code></td><td>texto o vacío</td><td>Se vació el tubo durante el intervalo.</td><td>Explicar una marca del registro. No se usa para medir</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Así se ve un registro</h3>
-      <pre class="codigo"><code>{
-  "id": "MV-20261114-0016",
-  "station_id": "SJM-PLAZA-01",
-  "timestamp": "2026-11-14T20:30:00-03:00",
-  "rainfall_mm": 1.6,
-  "temperature_c": 14.2,
-  "source": "automatico",
-  "verified": false,
-  "published_at": "2026-11-14T22:41:00-03:00",
-  "estado": "simulado",
-  "tube_empty": false,
-  "note": null
-}</code></pre>
-
-      <p class="nota">
-        La lluvia se guarda en milímetros, la fecha con zona horaria y el vacío como vacío.
-        Un dato que falta no se convierte en cero: son cosas distintas. La página lee estos
-        nombres tal cual, sin traducirlos, y descarta el registro que no los trae.
-      </p>
-    </div>
-  </section>
-
-  <!-- 05 Históricos -->
-  <section class="seccion" id="historicos">
-    <div class="contenido">
-      <p class="seccion__numero">Series anteriores</p>
-      <h2>Históricos</h2>
-      <p class="entrada">
-        Antes de este registro ya había mediciones ciudadanas. Estas series viven aparte, con
-        su fuente a la vista, para que nadie las confunda con lo que mide este pluviómetro.
-      </p>
-
-      <div class="aviso-vacio" id="historico-estado">
-        <p class="aviso-vacio__titulo">Sin serie real incorporada</p>
-        <p>
-          Todavía no hay antecedentes ciudadanos cargados. Cuando exista una serie, se
-          identificará la fuente y su permiso de uso antes de publicarla. Mientras tanto se
-          muestra una serie ficticia, rotulada como tal, para probar la vista.
-        </p>
-      </div>
-
-      <table class="tabla">
-        <caption class="tabla__titulo">Serie ficticia de totales diarios, para prueba de la vista</caption>
-        <thead>
-          <tr><th scope="col">Día</th><th scope="col" class="num">Total del día</th><th scope="col">Fuente</th><th scope="col">Observación</th></tr>
-        </thead>
-        <tbody><!-- lo llena app.js --></tbody>
-      </table>
-
-      <ul class="reglas">
-        <li>Un total diario no se convierte en intensidad horaria. Son medidas distintas.</li>
-        <li>Los registros de otro punto no se usan como referencia del sensor.</li>
-        <li>Un vacío se conserva como vacío y se explica; no se rellena con cero.</li>
-        <li>Cada serie conserva su archivo original y su fuente.</li>
-      </ul>
-    </div>
-  </section>
-
-</main>
-
-<footer class="pie">
-  <div class="contenido">
-    <div class="pie__columnas">
-      <div>
-        <p class="pie__titulo">Maipo Vigía</p>
-        <p class="pie__texto">
-          Pluviómetros del Cajón del Maipo. Un punto con lecturas de prueba simuladas y cinco
-          puntos propuestos, todavía sin instalar.
-        </p>
-      </div>
-      <div>
-        <p class="pie__titulo">Estos datos</p>
-        <p class="pie__texto" id="modo-datos">Comprobando el origen de los datos…</p>
-      </div>
-      <div>
-        <p class="pie__titulo">Cómo se abrió</p>
-        <p class="pie__texto" id="modo">
-          Comprobando desde dónde se abrió…
-        </p>
-      </div>
-    </div>
-    <p class="pie__titulo">Todas las páginas</p>
-    <ul class="enlaces-pie">
-      <li><a href="index.html">Ahora</a></li>
-      <li><a href="zona.html">Detalle de una zona</a></li>
-      <li><a href="registrar.html">Registrar una lectura</a></li>
-      <li><a href="avisar.html">Avisar algo</a></li>
-      <li><a href="historial.html">Historial de archivos</a></li>
-      <li><a href="archivo.html">Archivo abierto</a></li>
-      <li><a href="camino.html">El camino de hoy</a></li>
-      <li><a href="ayuda.html">Cómo leer el tablero</a></li>
-      <li><a href="kiosco.html">Pantalla de kiosco</a></li>
-      <li><a href="observadores.html">Padrón de observadores</a></li>
-    </ul>
-    <p class="pie__legal">
-      Última publicación: <span id="pie-actualizado">—</span>. Este panel no emite alertas y
-      no reemplaza a los organismos oficiales.
-    </p>
-  </div>
-</footer>
-
-<script>
-  /* Respaldo mínimo: si assets/app.js no llega a ejecutarse (archivo bloqueado o error
-     de sintaxis), el bloque de carga no puede quedarse avanzando para siempre. No pide
-     nada a la red y no reemplaza a app.js: solo informa qué falta. */
-  window.setTimeout(function () {
-    if (window.__maipoIniciado) return;
-    var carga = document.getElementById('estado-carga');
-    var error = document.getElementById('estado-error');
-    var motivo = document.getElementById('estado-error-motivo');
-    var cuenta = document.getElementById('tablero-cuenta');
-    var tableroError = document.getElementById('tablero-error');
-    var tableroMotivo = document.getElementById('tablero-error-motivo');
-    if (carga) carga.hidden = true;
-    if (cuenta) cuenta.textContent = 'El tablero no se pudo armar: el archivo assets/app.js no se ejecutó.';
-    if (tableroMotivo) tableroMotivo.textContent = 'El archivo assets/app.js no se ejecutó, así que las tarjetas de los puntos no se pudieron armar.';
-    if (tableroError) tableroError.hidden = false;
-    if (motivo) motivo.textContent = 'El archivo assets/app.js no se ejecutó, así que la ' +
-      'tabla, el gráfico y las descargas no se pueden armar.';
-    if (error) error.hidden = false;
-  }, 3000);
-</script>
-
-<script>
-  /* El rótulo del origen de los datos no puede quedar fijo: cambia según lo
-     que el publicador dejó en datos/registros.js. No pide nada a la red. */
-  document.addEventListener('DOMContentLoaded', function () {
-    var metros = window.REGISTROS || {};
-    var rotulo, detalle, modo;
-    if (typeof metros.label === 'string' && /simulad|ficticia/i.test(metros.label)) {
-      rotulo = 'Datos de prueba simulados';
-      detalle = 'No corresponden a una medición real.';
-      modo = rotulo;
-    } else if (metros.generated_at || metros.published_at) {
-      rotulo = 'Datos publicados desde la estación · muestra la hora de publicación y que no es alerta oficial';
-      detalle = 'Muestra la hora de publicación del archivo publicado.';
-      modo = rotulo;
-    } else {
-      rotulo = 'Origen de los datos no declarado en el archivo publicado';
-      detalle = 'No se puede afirmar de dónde vienen los datos.';
-      modo = rotulo;
-    }
-    var nodo = document.getElementById('origen-datos');
-    if (nodo) nodo.textContent = rotulo;
-    nodo = document.getElementById('origen-detalle');
-    if (nodo) nodo.textContent = detalle;
-    nodo = document.getElementById('modo-datos');
-    if (nodo) nodo.textContent = modo;
-  });
-</script>
-
+  
 </body>
 </html>
