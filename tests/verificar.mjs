@@ -870,7 +870,51 @@ async function pruebasE2E(cdp, base) {
     verdad(/una hora/.test(aviso), 'el aviso no menciona la hora: ' + aviso);
   });
 
+  await prueba('Gráfico de zona con eje 00–24 h y hora real', async () => {
+    await e.reiniciar();
+    await e.login('90000001', '9999');
+
+    await e.abrirTab('directiva');
+    await e.abrirSub('oficial');
+    await cdp.evaluar(`(() => {
+      const sel = document.getElementById('ofPunto');
+      sel.value = 'el-melocoton';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    })()`);
+    await e.escribir('#ofHora', '09:30');
+    await e.escribir('#ofMm', '5,5');
+    await e.clic('#btnGuardarOficial');
+    await pausa(300);
+
+    await e.abrirTab('ahora');
+    await e.abrirSub('lluvia');
+    await e.clic('[data-open-zone="el-melocoton"]');
+    await cdp.esperar(`!!document.querySelector('.chart-svg')`);
+
+    const etiquetas = await cdp.evaluar(`[...document.querySelectorAll('.chart-svg text')].map(t => t.textContent.trim())`);
+    for (const esperada of ['00 h', '06 h', '12 h', '18 h', '24 h']) {
+      verdad(etiquetas.includes(esperada), 'falta la etiqueta ' + esperada + ': ' + etiquetas.join(' | '));
+    }
+    const negativas = etiquetas.filter(t => /^-\d+\s*h$/.test(t) || /-\d+\s*h/.test(t));
+    igual(negativas, [], 'quedaron horarios negativos');
+    verdad(!etiquetas.includes('-23 h'), 'sigue apareciendo -23 h');
+
+    const titulos = await cdp.evaluar(`[...document.querySelectorAll('.chart-svg title')].map(t => t.textContent.trim()).filter(t => t !== 'Hora actual')`);
+    igual(titulos.length, 24, 'franjas horarias dibujadas');
+    verdad(titulos.every(t => /^\d{2}:00–\d{2}:00: /.test(t)), 'título fuera de formato: ' + titulos.slice(0, 3).join(' | '));
+    verdad(titulos.some(t => t.startsWith('09:00–10:00:') && /5,5 mm/.test(t)), 'la lectura de 09:30 no cayó en su franja: ' + titulos.filter(t => /5,5/.test(t)).join(' | '));
+
+    const aria = await cdp.evaluar(`document.querySelector('.chart-svg').getAttribute('aria-label')`);
+    verdad(/00 a 24 h/.test(aria), 'aria-label inesperado: ' + aria);
+    const pie = await e.texto('#mainContent');
+    verdad(/Franja de 00 a 24 h/.test(pie), 'falta la leyenda de franja horaria');
+    const barras = await cdp.evaluar(`document.querySelectorAll('.chart-svg rect').length`);
+    igual(barras, 24, 'barras del gráfico');
+  });
+
   await prueba('Crear, editar y quitar un punto con hoja de confirmación', async () => {
+    await e.abrirTab('directiva');
     await e.abrirSub('datos');
     await e.clic('#btnNuevoPunto');
     await e.escribir('#ptNombre', 'Punto Suite');

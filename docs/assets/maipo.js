@@ -76,6 +76,41 @@
         return p.anio + '-' + p.mes + '-' + p.dia;
       }
 
+      function horaChileDeTs(tsMs) {
+        if (!Number.isFinite(tsMs)) return null;
+        const p = partesFechaChile(new Date(tsMs));
+        return Number(p.hora);
+      }
+
+      function fechaCortaChile(fechaISO) {
+        const p = String(fechaISO || '').split('-');
+        return p.length === 3 ? p[2] + '/' + p[1] : String(fechaISO || '');
+      }
+
+      /* Serie del día actual: 24 franjas de 00:00–01:00 a 23:00–24:00. */
+      function serieHoyEstacion(s) {
+        const hoy = hoyLocalISO();
+        const serie = new Array(24).fill(null);
+
+        if (s && s.hourlyDay === hoy && Array.isArray(s.hourly24h) && s.hourly24h.length === 24) {
+          for (let i = 0; i < 24; i++) serie[i] = s.hourly24h[i];
+        }
+
+        const lecturas = (state.readings || [])
+          .filter(r => r.station_id === s.id && lecturaValida(r) && r.timestamp)
+          .map(r => {
+            const ts = new Date(r.timestamp).getTime();
+            return { ts: ts, mm: r.rainfall_mm, fecha: fechaChileDe(ts), hora: horaChileDeTs(ts) };
+          })
+          .filter(x => x.fecha === hoy && Number.isFinite(x.hora))
+          .sort((a, b) => a.ts - b.ts);
+
+        lecturas.forEach(x => {
+          serie[x.hora] = (x.mm === null || x.mm === undefined) ? null : x.mm;
+        });
+        return serie;
+      }
+
       function lecturaValida(r) {
         return !!(r && (r.verified === true || r.oficial === true ||
           r.estado_validacion === 'Validada' || r.estado_validacion === 'Corregida'));
@@ -1010,36 +1045,52 @@
 
         let body = '';
         if (ui.zoneSubtab === 'lluvia24') {
-          const maxBar = Math.max(20, ...s.hourly24h.map(v => v || 0));
+          const serie = serieHoyEstacion(s);
+          const horaActual = horaChileDeTs(Date.now());
+          const maxBar = Math.max(20, ...serie.map(v => v || 0));
           const svgW = 680;
           const svgH = 210;
           const padL = 56;
+          const padR = 26;
           const padB = 28;
           const padT = 16;
-          const plotW = svgW - padL - 16;
+          const plotW = svgW - padL - padR;
           const plotH = svgH - padT - padB;
-          const yFor = val => padT + plotH - (Math.min(val, maxBar) / maxBar) * plotH;
+          const slotW = plotW / 24;
+          const barW = Math.max(8, Math.floor(slotW) - 4);
+          const baseY = padT + plotH;
+          const yFor = val => baseY - (Math.min(val, maxBar) / maxBar) * plotH;
+          const dos = n => String(n).padStart(2, '0');
 
           const y5 = yFor(THRESHOLDS.amber1h);
           const y15 = yFor(THRESHOLDS.red1h);
-          const barW = Math.floor(plotW / 24) - 4;
 
-          const barsSvg = s.hourly24h.map((v, idx) => {
-            const x = padL + idx * (plotW / 24) + 2;
+          const barsSvg = serie.map((v, idx) => {
+            const x = padL + idx * slotW + 2;
+            const titulo = `${dos(idx)}:00–${dos(idx + 1)}:00: ${v === null ? 'Sin dato' : formatMm(v) + ' mm'}`;
+
             if (v === null) {
-              return `<rect x="${x}" y="${padT + plotH - 6}" width="${barW}" height="6" fill="#C4D0CD" rx="2"/>`;
+              if (idx > horaActual) {
+                return `<rect x="${x}" y="${baseY - 3}" width="${barW}" height="3" fill="#E2E6E5" rx="2"><title>${titulo}</title></rect>`;
+              }
+              return `<rect x="${x}" y="${baseY - 6}" width="${barW}" height="6" fill="#C4D0CD" rx="2"><title>${titulo}</title></rect>`;
             }
+
             const h = Math.max(2, (v / maxBar) * plotH);
-            const y = padT + plotH - h;
+            const y = baseY - h;
             const fill = v >= THRESHOLDS.red1h ? '#8C1D18' : (v >= THRESHOLDS.amber1h ? '#6D4004' : '#14573A');
-            return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${fill}" rx="2"><title>Hora -${23 - idx}h: ${formatMm(v)} mm</title></rect>`;
+            return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${fill}" rx="2"><title>${titulo}</title></rect>`;
           }).join('');
 
-          const xLabels = [0, 6, 12, 18, 23].map(idx => {
-            const x = padL + idx * (plotW / 24) + barW / 2;
-            const txt = idx === 23 ? 'Ahora' : `-${23 - idx} h`;
-            return `<text x="${x}" y="${svgH - 6}" font-size="16" fill="#33424B" text-anchor="middle">${txt}</text>`;
-          }).join('');
+          const xLabels = [
+            { x: padL, txt: '00 h', anchor: 'start' },
+            { x: padL + (6 / 24) * plotW, txt: '06 h', anchor: 'middle' },
+            { x: padL + (12 / 24) * plotW, txt: '12 h', anchor: 'middle' },
+            { x: padL + (18 / 24) * plotW, txt: '18 h', anchor: 'middle' },
+            { x: padL + plotW, txt: '24 h', anchor: 'end' }
+          ].map(l => `<text x="${l.x}" y="${svgH - 6}" font-size="16" fill="#33424B" text-anchor="${l.anchor}">${l.txt}</text>`).join('');
+
+          const ahoraX = padL + ((horaActual + 0.5) / 24) * plotW;
 
           body = `
             <div class="card-box">
@@ -1053,17 +1104,20 @@
                 </div>
               </div>
               <div class="chart-wrap">
-                <svg class="chart-svg" viewBox="0 0 ${svgW} ${svgH}" role="img" aria-label="Gráfico de lluvia últimas 24 horas en ${escapeHtml(s.name)}">
-                  <line x1="${padL}" y1="${padT + plotH}" x2="${svgW - 16}" y2="${padT + plotH}" stroke="#33424B" stroke-width="2"/>
-                  <line x1="${padL}" y1="${y5}" x2="${svgW - 16}" y2="${y5}" stroke="#6D4004" stroke-width="2" stroke-dasharray="6,4"/>
+                <svg class="chart-svg" viewBox="0 0 ${svgW} ${svgH}" role="img" aria-label="Gráfico de lluvia de hoy (00 a 24 h) en ${escapeHtml(s.name)}">
+                  <line x1="${padL}" y1="${baseY}" x2="${padL + plotW}" y2="${baseY}" stroke="#33424B" stroke-width="2"/>
+                  <line x1="${padL}" y1="${y5}" x2="${padL + plotW}" y2="${y5}" stroke="#6D4004" stroke-width="2" stroke-dasharray="6,4"/>
                   <text x="4" y="${y5 + 5}" font-size="16" font-weight="700" fill="#6D4004">5 mm</text>
-                  <line x1="${padL}" y1="${y15}" x2="${svgW - 16}" y2="${y15}" stroke="#8C1D18" stroke-width="2" stroke-dasharray="6,4"/>
+                  <line x1="${padL}" y1="${y15}" x2="${padL + plotW}" y2="${y15}" stroke="#8C1D18" stroke-width="2" stroke-dasharray="6,4"/>
                   <text x="0" y="${y15 + 5}" font-size="16" font-weight="700" fill="#8C1D18">15 mm</text>
                   ${barsSvg}
+                  <line x1="${ahoraX}" y1="${padT}" x2="${ahoraX}" y2="${baseY}" stroke="#33424B" stroke-width="2" stroke-dasharray="4 4" opacity="0.55">
+                    <title>Hora actual</title>
+                  </line>
                   ${xLabels}
                 </svg>
               </div>
-              <p class="muted mt-12">Umbrales de ${THRESHOLDS.amber1h} mm y ${THRESHOLDS.red1h} mm por hora son provisionales, sin validar con SERNAGEOMIN.</p>
+              <p class="muted mt-12">Día actual (${fechaCortaChile(hoyLocalISO())}) · Franja de 00 a 24 h · Umbrales de ${THRESHOLDS.amber1h} mm y ${THRESHOLDS.red1h} mm por hora son provisionales, sin validar con SERNAGEOMIN.</p>
             </div>
           `;
         } else if (ui.zoneSubtab === 'quien') {
@@ -4780,10 +4834,21 @@
           st.minutesAgo = opciones.minutesAgo;
           st.measuredAt = ahora - opciones.minutesAgo * 60000;
           st.timeText = null;
-          /* La serie de 24 h solo se toca si la lectura es de la última hora. */
-          if (opciones.minutesAgo <= 60 && Array.isArray(st.hourly24h) && st.hourly24h.length) {
-            st.hourly24h[st.hourly24h.length - 1] = mmVal;
+        }
+
+        /* La serie del día usa la hora real de la medición, no la última franja. */
+        if (Number.isFinite(st.measuredAt)) {
+          const diaMedicion = fechaChileDe(st.measuredAt);
+          const horaSlot = horaChileDeTs(st.measuredAt);
+          if (diaMedicion === hoyLocalISO() && Number.isFinite(horaSlot)) {
+            if (st.hourlyDay !== diaMedicion) {
+              st.hourly24h = new Array(24).fill(null);
+              st.hourlyDay = diaMedicion;
+            }
+            st.hourly24h[horaSlot] = mmVal;
           }
+        } else if (st.measuredAt === null && estadoLectura === 'sin_dato') {
+          /* Sin dato no ocupa ninguna franja. */
         }
 
         if (opciones.countAsObserver !== false) {
