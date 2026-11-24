@@ -540,12 +540,12 @@ grant execute on function mv_cambiar_estado_observador(uuid, text, text, text) t
 -- DATOS INICIALES (los mismos seis puntos de la semilla)
 -- ============================================================================
 insert into mv_puntos (id, station_id, nombre, quebrada, tiene_sensor, estado_sensor, orden) values
-  ('san-alfonso',   'SJM-SANALFONSO-01', 'San Alfonso',   'Estero San Alfonso', true,  'Equipo LoRa activo · batería 84 %', 1),
-  ('el-melocoton',  'SJM-ELMELOCOTON-01','El Melocotón',  null,                 true,  'Equipo LoRa activo · batería 78 %', 2),
-  ('el-manzano',    'SJM-ELMANZANO-01',  'El Manzano',    null,                 true,  'Equipo LoRa activo · batería 91 %', 3),
-  ('el-canelo',     'SJM-ELCANELO-01',   'El Canelo',     null,                 true,  'Equipo LoRa activo · batería 72 %', 4),
-  ('san-gabriel',   'SJM-SANGABRIEL-01', 'San Gabriel',   null,                 true,  'Sin transmisión desde ayer 18:00',  5),
-  ('plaza-de-armas','SJM-PLAZA-01',      'Plaza de Armas',null,                 false, 'Equipo no instalado todavía',       6)
+  ('san-alfonso',   'SJM-SANALFONSO-01', 'San Alfonso',   'Estero San Alfonso', false, 'Equipo no instalado todavía', 1),
+  ('el-melocoton',  'SJM-ELMELOCOTON-01','El Melocotón',  null,                 false, 'Equipo no instalado todavía', 2),
+  ('el-manzano',    'SJM-ELMANZANO-01',  'El Manzano',    null,                 false, 'Equipo no instalado todavía', 3),
+  ('el-canelo',     'SJM-ELCANELO-01',   'El Canelo',     null,                 false, 'Equipo no instalado todavía', 4),
+  ('san-gabriel',   'SJM-SANGABRIEL-01', 'San Gabriel',   null,                 false, 'Equipo no instalado todavía', 5),
+  ('plaza-de-armas','SJM-PLAZA-01',      'Plaza de Armas',null,                 false, 'Equipo no instalado todavía', 6)
 on conflict (id) do nothing;
 
 insert into mv_tramos (id, nombre, orden) values

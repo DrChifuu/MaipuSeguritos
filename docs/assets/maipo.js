@@ -18,8 +18,8 @@
         red1h: 15.0,
         amber3h: 15.0,
         red3h: 30.0,
-        staleMinutes: 30,
-        ventanaTableroMin: 90,
+        staleMinutes: 60,
+        ventanaTableroMin: 60,
         status: 'provisional',
         validatedBy: null,
         version: '0.1-provisional'
@@ -68,6 +68,17 @@
       function horaLocalHHMM() {
         const p = partesFechaChile();
         return p.hora + ':' + p.minuto;
+      }
+
+      function fechaChileDe(tsMs) {
+        if (!Number.isFinite(tsMs)) return '';
+        const p = partesFechaChile(new Date(tsMs));
+        return p.anio + '-' + p.mes + '-' + p.dia;
+      }
+
+      function lecturaValida(r) {
+        return !!(r && (r.verified === true || r.oficial === true ||
+          r.estado_validacion === 'Validada' || r.estado_validacion === 'Corregida'));
       }
 
       function haceNDiasISO(dias) {
@@ -254,6 +265,11 @@
       function migrarTiemposEstado(st) {
         if (!st || typeof st !== 'object') return st;
         const ahora = Date.now();
+        ['stations', 'roads', 'roadChanges', 'readings', 'citizenReports', 'observers', 'files', 'uploadDrafts']
+          .forEach(k => { if (!Array.isArray(st[k])) st[k] = []; });
+        if (!Array.isArray(st.myReportIds)) st.myReportIds = [];
+        if (!Number.isFinite(st.avisarCooldownUntil)) st.avisarCooldownUntil = null;
+        if (!st.lastDailyArchiveDate) st.lastDailyArchiveDate = null;
 
         if (!Number.isFinite(st.updatedAt)) st.updatedAt = ahora;
         if (!Number.isFinite(st.roadRefreshedAt)) {
@@ -1219,6 +1235,60 @@
         `;
       }
 
+      function enCooldownAviso() {
+        return !!(state.avisarCooldownUntil && Date.now() < state.avisarCooldownUntil);
+      }
+
+      function bloqueCooldownAviso() {
+        if (!enCooldownAviso()) return '';
+        return `<div class="amber-banner" role="status">
+          <span>Para evitar envíos repetidos, podrás enviar otro aviso en
+            <span id="avisarCooldownCountdown" data-live-cooldown="${state.avisarCooldownUntil}">${formatCountdown(state.avisarCooldownUntil - Date.now())}</span>.</span>
+        </div>`;
+      }
+
+      function misAvisosEnRevision() {
+        const mios = Array.isArray(state.myReportIds) ? state.myReportIds : [];
+        return (state.citizenReports || []).filter(a =>
+          (a.esMio === true || mios.includes(a.id)) && a.estado === 'En revisión');
+      }
+
+      function bloqueMisAvisos() {
+        const avisos = misAvisosEnRevision();
+        if (!avisos.length) return '';
+        return `<div class="card-box mt-12">
+          <h3 class="section-title mb-8">Tu aviso enviado</h3>
+          <div class="row-list">
+            ${avisos.map(a => `
+              <div class="item-row">
+                <div class="row-main">
+                  <div class="row-title"><strong>${escapeHtml(a.tramo)}</strong> · ${escapeHtml(a.tipo)}</div>
+                  <div class="row-sub">${liveTimeSpan(a.createdAt, 'relativo', a.hora)} · En revisión</div>
+                </div>
+                <button type="button" class="btn-danger" data-cancel-report="${escapeHtml(a.id)}">Cancelar aviso</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+      }
+
+      function cancelarMiAviso(reportId) {
+        const aviso = (state.citizenReports || []).find(a => a.id === reportId);
+        const mios = Array.isArray(state.myReportIds) ? state.myReportIds : [];
+        if (!aviso || (aviso.esMio !== true && !mios.includes(aviso.id))) return;
+        if (aviso.estado !== 'En revisión') return;
+
+        aviso.estado = 'Cancelado';
+        aviso.canceladoEn = Date.now();
+        const road = state.roads.find(r => r.id === aviso.road_id);
+        if (road) road.pendingReports = Math.max(0, (road.pendingReports || 1) - 1);
+
+        saveState();
+        showToast('Aviso cancelado.');
+        renderAll();
+        if (ui.sheetType === 'avisar') renderSheet();
+      }
+
       function renderCaminoInformar() {
         if (ui.informSent) {
           return `
@@ -1233,6 +1303,8 @@
                 <button type="button" id="btnInformToEstado">Volver al camino</button>
               </div>
             </div>
+            ${bloqueCooldownAviso()}
+            ${bloqueMisAvisos()}
           `;
         }
 
@@ -1244,7 +1316,9 @@
           { id: 'sindato', label: 'Sin dato' }
         ];
 
+        const enEspera = enCooldownAviso();
         return `
+          ${bloqueCooldownAviso()}
           <div class="card-box">
             <h2 class="section-title mb-12">Informar estado del camino</h2>
 
@@ -1292,9 +1366,10 @@
 
             <div class="flex-between mt-16">
               <span class="muted">Un aviso vecino nunca cambia el color por sí solo.</span>
-              <button type="button" class="btn-primary" id="btnSendInform">Enviar aviso</button>
+              <button type="button" class="btn-primary" id="btnSendInform" ${enEspera ? 'disabled' : ''}>Enviar aviso</button>
             </div>
           </div>
+          ${bloqueMisAvisos()}
         `;
       }
 
@@ -1501,11 +1576,23 @@
          ------------------------------------------------------------------------ */
       function renderArchivoArchivos() {
         const role = getRole();
+        const hoy = hoyLocalISO();
+        const validadasHoy = (state.readings || []).some(r => {
+          if (!lecturaValida(r) || !r.timestamp) return false;
+          return fechaChileDe(new Date(r.timestamp).getTime()) === hoy;
+        });
+        const puedeCierre = role === 'directiva' || validadasHoy;
+
         return `
-          <div class="flex-between mb-12">
+          <div class="flex-between mb-8">
             <h2 class="section-title">Archivos publicados</h2>
-            ${role === 'directiva' ? `<button type="button" class="btn-primary" id="btnArchivoOpenSubir">Subir archivo</button>` : ''}
+            <div class="flex-row">
+              ${puedeCierre ? `<button type="button" id="btnGenerateDailyCsv">Generar cierre de hoy (CSV)</button>` : ''}
+              ${role === 'directiva' ? `<button type="button" class="btn-primary" id="btnArchivoOpenSubir">Subir archivo</button>` : ''}
+            </div>
           </div>
+          <p class="muted mb-12">Formato predeterminado: <strong>CSV</strong>, el más liviano y usable.</p>
+          ${state.files.length === 0 ? `<div class="card-box"><p class="muted" style="margin:0;">Todavía no hay archivos publicados. La directiva puede subir uno o generar el cierre del día.</p></div>` : ''}
           <div class="row-list">
             ${state.files.map(f => `
               <article class="item-row file-row">
@@ -1974,7 +2061,7 @@
             </div>
 
             <button type="button" class="btn-primary btn-full" id="btnGuardarOficial">Guardar lectura oficial</button>
-            <p class="muted mt-8" style="margin-bottom:0;">Si es de la última hora y media, actualiza el tablero; si es más antigua, queda en el historial.</p>
+            <p class="muted mt-8" style="margin-bottom:0;">Si es de la última hora (60 minutos), actualiza el tablero; si es más antigua, queda en el historial.</p>
           </div>
 
           <h3 class="section-title mt-16 mb-8">Últimos ingresos oficiales</h3>
@@ -2395,6 +2482,81 @@
         };
       }
 
+      function construirDatasetDiario(fechaISO, lecturasDelDia) {
+        const filas = (lecturasDelDia || []).map(r => {
+          const ts = new Date(r.timestamp).getTime();
+          const p = Number.isFinite(ts) ? partesFechaChile(new Date(ts)) : null;
+          return {
+            fecha: p ? `${p.anio}-${p.mes}-${p.dia} ${p.hora}:${p.minuto}` : String(r.timeLabel || ''),
+            punto: r.point_name || r.station_id || 'Sin punto',
+            mm: (r.rainfall_mm === null || r.rainfall_mm === undefined) ? null : r.rainfall_mm,
+            origen: r.observador_alias || r.instrumento || 'Archivo'
+          };
+        });
+
+        const resumen = resumenDeArchivo(filas);
+        return {
+          id: 'diario-' + fechaISO,
+          name: 'lluvia_diaria_' + fechaISO + '.csv',
+          format: 'CSV',
+          autoDaily: true,
+          dailyDate: fechaISO,
+          columnsRecognized: true,
+          publishedAt: Date.now(),
+          canUndo: false,
+          rowsCountLabel: filas.length + ' filas',
+          updatedLabel: 'cierre del ' + fechaISO,
+          summary: resumen.summary,
+          byPoint: resumen.byPoint,
+          byHour: resumen.byHour,
+          rows: filas
+        };
+      }
+
+      /* Genera o actualiza el CSV de cada día ya cerrado. Con forzarHoy también
+         crea el de hoy, para que la directiva pueda descargarlo en el momento. */
+      function revisarCierreDiarioAutomatico(opciones) {
+        const op = opciones || {};
+        const hoy = hoyLocalISO();
+        const porFecha = new Map();
+
+        (state.readings || []).forEach(r => {
+          if (!lecturaValida(r) || !r.timestamp) return;
+          const ts = new Date(r.timestamp).getTime();
+          const fecha = fechaChileDe(ts);
+          if (!fecha) return;
+          if (!porFecha.has(fecha)) porFecha.set(fecha, []);
+          porFecha.get(fecha).push(r);
+        });
+
+        let cambios = 0;
+        porFecha.forEach((lecturas, fecha) => {
+          if (fecha > hoy) return;
+          if (fecha === hoy && !op.forzarHoy) return;
+          if (!lecturas.length) return;
+
+          const dataset = construirDatasetDiario(fecha, lecturas);
+          const indice = state.files.findIndex(f =>
+            f.id === dataset.id || (f.autoDaily && f.dailyDate === fecha));
+
+          if (indice >= 0) {
+            dataset.publishedAt = state.files[indice].publishedAt || dataset.publishedAt;
+            state.files[indice] = dataset;
+          } else {
+            state.files.unshift(dataset);
+          }
+          cambios += 1;
+        });
+
+        if (cambios) {
+          if (!state.activeFileId || !state.files.some(f => f.id === state.activeFileId)) {
+            state.activeFileId = state.files[0] ? state.files[0].id : null;
+          }
+          saveState();
+        }
+        return cambios;
+      }
+
       function indicesDeArchivosPublicados() {
         const indice = new Map();
         (state.files || []).forEach(archivo => {
@@ -2637,7 +2799,7 @@
                   <div class="item-row">${statePill('verde', 'rain')}<span>Menos de ${THRESHOLDS.amber1h} mm en la última hora. No significa que no llueva.</span></div>
                   <div class="item-row">${statePill('ambar', 'rain')}<span>${THRESHOLDS.amber1h} mm o más en una hora. Mire el cielo y el río.</span></div>
                   <div class="item-row">${statePill('rojo', 'rain')}<span>${THRESHOLDS.red1h} mm o más en una hora. No baje a la quebrada.</span></div>
-                  <div class="item-row">${statePill('sindato', 'rain')}<span>Sin lectura hace más de ${THRESHOLDS.staleMinutes} minutos. Jamás es verde.</span></div>
+                  <div class="item-row">${statePill('sindato', 'rain')}<span>Sin lectura hace más de una hora (${THRESHOLDS.staleMinutes} minutos). Jamás es verde.</span></div>
                 </div>
                 <div class="help-visual-box">
                   <svg width="260" height="220" viewBox="0 0 260 220" role="img" aria-label="Cuatro formas del semáforo">
@@ -2818,11 +2980,14 @@
                 <p style="margin:0 0 16px 0;">Esto no es una alerta oficial: si hay peligro, llama a Bomberos (132) o Carabineros (133).</p>
                 <button type="button" class="btn-primary btn-full" id="btnCloseAvisarDone">Entendido</button>
               </div>
+              ${bloqueCooldownAviso()}
+              ${bloqueMisAvisos()}
             `;
           } else {
             const tipos = ['El río viene creciendo', 'Cayó tierra o piedras en el camino', 'El camino está cortado'];
             bodyEl.innerHTML = `
               <p class="muted mb-12">Sin registro. No pedimos nombre, correo ni teléfono.</p>
+              ${bloqueCooldownAviso()}
               <div class="mb-12">
                 <div class="field-label">1 · ¿Qué está pasando?</div>
                 <div class="row-list">
@@ -2848,7 +3013,8 @@
                 <input type="file" id="avisarPhotoInput" accept="image/*" style="min-height:56px; padding:12px 0;" />
                 ${fotoHtml(ui.avisarPhoto, 'Foto del aviso')}
               </div>
-              <button type="button" class="btn-primary btn-full" id="btnSendAvisar">Enviar aviso</button>
+              <button type="button" class="btn-primary btn-full" id="btnSendAvisar" ${enCooldownAviso() ? 'disabled' : ''}>Enviar aviso</button>
+              ${bloqueMisAvisos()}
             `;
           }
         } else if (ui.sheetType === 'road-detail') {
@@ -3152,8 +3318,8 @@
             <article class="kiosco-card k-${st}">
               <div class="flex-between">
                 <h2 style="font-family:var(--font-serif); font-size:36px; margin:0;">${escapeHtml(p.name)}</h2>
-                <span class="k-text-${st}" style="display:inline-flex; align-items:center; gap:10px; font-size:26px; font-weight:700;">
-                  ${svgState(st, 30)}
+                <span class="k-badge k-badge-${st}">
+                  ${svgState(st, 24)}
                   <span>${rainLabel(st)}</span>
                 </span>
               </div>
@@ -3307,10 +3473,16 @@
         const btnSendInf = document.getElementById('btnSendInform');
         if (btnSendInf) {
           btnSendInf.onclick = () => {
+            if (state.avisarCooldownUntil && Date.now() < state.avisarCooldownUntil) {
+              showToast('Espera ' + formatCountdown(state.avisarCooldownUntil - Date.now()) + ' antes de enviar otro aviso.');
+              return;
+            }
             const road = state.roads.find(r => r.id === ui.informRoadId);
             if (road) road.pendingReports = (road.pendingReports || 0) + 1;
+            const idInforme = 'AV-' + String(Math.floor(100 + Math.random() * 900));
             state.citizenReports.unshift({
-              id: 'AV-' + String(Math.floor(100 + Math.random() * 900)),
+              id: idInforme,
+              esMio: true,
               road_id: ui.informRoadId,
               tramo: road ? road.name : ui.informRoadId,
               tipo: ui.informChip,
@@ -3322,6 +3494,9 @@
               estado: 'En revisión',
               source: 'Vecino'
             });
+            state.myReportIds = Array.isArray(state.myReportIds) ? state.myReportIds : [];
+            state.myReportIds.push(idInforme);
+            state.avisarCooldownUntil = Date.now() + (CONFIG.cooldownAvisoSeg || 120) * 1000;
             saveState();
             ui.informSent = true;
             ui.informPhoto = '';
@@ -3403,6 +3578,18 @@
         /* Archivo */
         const btnArcSub = document.getElementById('btnArchivoOpenSubir');
         if (btnArcSub) btnArcSub.onclick = () => openSheet('subir');
+        const btnDaily = document.getElementById('btnGenerateDailyCsv');
+        if (btnDaily) {
+          btnDaily.onclick = () => {
+            const creados = revisarCierreDiarioAutomatico({ forzarHoy: true });
+            if (creados) {
+              renderAll();
+              showToast('Cierre de hoy generado en CSV.');
+            } else {
+              showToast('No hay lecturas validadas hoy para cerrar.');
+            }
+          };
+        }
         document.querySelectorAll('[data-open-file-board]').forEach(b => {
           b.onclick = () => {
             state.activeFileId = b.dataset.openFileBoard;
@@ -3866,11 +4053,17 @@
           const btnSendA = document.getElementById('btnSendAvisar');
           if (btnSendA) {
             btnSendA.onclick = () => {
+              if (state.avisarCooldownUntil && Date.now() < state.avisarCooldownUntil) {
+                showToast('Espera ' + formatCountdown(state.avisarCooldownUntil - Date.now()) + ' antes de enviar otro aviso.');
+                return;
+              }
               const road = state.roads.find(r => r.name === ui.avisarPoint);
               if (road) road.pendingReports = (road.pendingReports || 0) + 1;
               const sug = ui.avisarTipo === 'El camino está cortado' ? 'rojo' : 'ambar';
+              const idAviso = 'AV-' + String(Math.floor(100 + Math.random() * 900));
               state.citizenReports.unshift({
-                id: 'AV-' + String(Math.floor(100 + Math.random() * 900)),
+                id: idAviso,
+                esMio: true,
                 road_id: road ? road.id : 'san-alfonso',
                 tramo: ui.avisarPoint,
                 tipo: ui.avisarTipo,
@@ -3882,6 +4075,9 @@
                 estado: 'En revisión',
                 source: 'Vecino'
               });
+              state.myReportIds = Array.isArray(state.myReportIds) ? state.myReportIds : [];
+              state.myReportIds.push(idAviso);
+              state.avisarCooldownUntil = Date.now() + (CONFIG.cooldownAvisoSeg || 120) * 1000;
               saveState();
               ui.avisarDone = true;
               renderSheet();
@@ -4250,10 +4446,8 @@
             countAsObserver: false
           });
           mensaje = `Lectura oficial guardada: ${formatMm(lectura.rainfall_mm)} mm en ${st.name}.`;
-        } else if (minutos > THRESHOLDS.staleMinutes && minutos <= THRESHOLDS.ventanaTableroMin) {
-          mensaje = `Lectura guardada en el historial: tiene ${Math.round(minutos)} minutos, más de los ${THRESHOLDS.staleMinutes} de frescura. El tablero no cambia.`;
         } else {
-          mensaje = 'Lectura histórica guardada en el archivo. El tablero de ahora no cambia.';
+          mensaje = 'Lectura guardada en el historial: tiene más de una hora. El tablero de ahora no cambia.';
         }
 
         saveState();
@@ -4733,6 +4927,21 @@
           }
         }
 
+        if (state.avisarCooldownUntil) {
+          const restante = state.avisarCooldownUntil - ahora;
+          if (restante <= 0) {
+            state.avisarCooldownUntil = null;
+            saveState();
+            if (ui.sheetType === 'avisar') renderSheet();
+            if (!ui.sheetType && ui.tab === 'camino' && ui.subtab === 'informar') renderAll();
+          } else {
+            document.querySelectorAll('[data-live-cooldown]').forEach(el => {
+              const fin = Number(el.getAttribute('data-live-cooldown'));
+              if (Number.isFinite(fin)) el.textContent = formatCountdown(fin - ahora);
+            });
+          }
+        }
+
         if (ui.kioscoActive) {
           const minuto = new Date(ahora).getMinutes();
           if (minuto !== ui.kioscoMinuto) {
@@ -4743,6 +4952,14 @@
 
         if (!forzar && ahora - ultimoTick15 < 15000) return;
         ultimoTick15 = ahora;
+
+        const hoy = hoyLocalISO();
+        if (state.lastDailyArchiveDate !== hoy) {
+          const creados = revisarCierreDiarioAutomatico({ forzarHoy: false });
+          state.lastDailyArchiveDate = hoy;
+          saveState();
+          if (creados && ui.tab === 'archivo' && !ui.kioscoActive) renderAll();
+        }
 
         actualizarTiemposEnDOM();
         checkSessionTimeout(true);
@@ -4804,6 +5021,13 @@
         });
 
         /* Tecla Escape cierra hojas o Kiosco */
+        document.addEventListener('click', e => {
+          const boton = e.target && e.target.closest ? e.target.closest('[data-cancel-report]') : null;
+          if (!boton) return;
+          e.preventDefault();
+          cancelarMiAviso(boton.getAttribute('data-cancel-report'));
+        });
+
         document.addEventListener('keydown', e => {
           if (e.key === 'Escape') {
             if (ui.kioscoActive) closeKiosco();
@@ -4898,6 +5122,9 @@
             }
           });
         }
+
+        state.lastDailyArchiveDate = hoyLocalISO();
+        revisarCierreDiarioAutomatico({ forzarHoy: false });
 
         parseHash();
         ui.firmaTiempos = estadoFirmaActual();

@@ -15,20 +15,21 @@ function buildInitialState() {
       station_id: 'SJM-SANALFONSO-01',
       name: 'San Alfonso',
       quebrada: 'Estero San Alfonso',
-      rainfall_mm: 18.4,
-      minutesAgo: 4,
-      measuredAt: ahora - 4 * 60000,
-      lastObserverAt: ahora - 1 * 60000,
-      timeText: null,
-      hasSensor: true,
-      sensorStatus: 'Equipo LoRa activo · batería 84 %',
-      observerCount24h: 3,
-      lastObserverHour: 'hoy a las 09:38',
-      hourly24h: [0,0,0,0,0,0,0,0,0,0.4,0.8,1.2,1.5,2.0,2.6,3.4,4.8,6.5,8.2,10.1,12.4,14.8,16.2,18.4],
+      rainfall_mm: null,
+      minutesAgo: null,
+      measuredAt: null,
+      lastObserverAt: null,
+      timeText: 'equipo no instalado',
+      hasSensor: false,
+      sensorStatus: 'Equipo no instalado todavía',
+      observerCount24h: 0,
+      lastObserverHour: 'sin lecturas hoy',
+      hourly24h: [null, null, null, null, null, null, null, null, null, null, null, null,
+                  null, null, null, null, null, null, null, null, null, null, null, null],
       actions: [
-        'No baje ni cruce el Estero San Alfonso.',
-        'Revise el estado del camino antes de salir.',
-        'Ante peligro inmediato llame a Bomberos o Carabineros.'
+        'El punto todavía no tiene equipo instalado.',
+        'Si eres observador acreditado, registra una lectura manual.',
+        'El tablero no reemplaza las alertas oficiales.'
       ]
     },
     {
@@ -36,20 +37,21 @@ function buildInitialState() {
       station_id: 'SJM-ELMELOCOTON-01',
       name: 'El Melocotón',
       quebrada: null,
-      rainfall_mm: 6.2,
-      minutesAgo: 11,
-      measuredAt: ahora - 11 * 60000,
-      lastObserverAt: ahora - 7 * 60000,
-      timeText: null,
-      hasSensor: true,
-      sensorStatus: 'Equipo LoRa activo · batería 78 %',
-      observerCount24h: 2,
-      lastObserverHour: 'hoy a las 09:31',
-      hourly24h: [0,0,0,0,0,0,0,0,0,0,0.2,0.4,0.6,0.8,1.1,1.5,2.0,2.4,3.1,3.9,4.5,5.0,5.6,6.2],
+      rainfall_mm: null,
+      minutesAgo: null,
+      measuredAt: null,
+      lastObserverAt: null,
+      timeText: 'equipo no instalado',
+      hasSensor: false,
+      sensorStatus: 'Equipo no instalado todavía',
+      observerCount24h: 0,
+      lastObserverHour: 'sin lecturas hoy',
+      hourly24h: [null, null, null, null, null, null, null, null, null, null, null, null,
+                  null, null, null, null, null, null, null, null, null, null, null, null],
       actions: [
-        'Observe el cielo y el agua en la ruta.',
-        'Evite bajar hacia San Alfonso por corte vigente.',
-        'Espere confirmación oficial antes de circular.'
+        'El punto todavía no tiene equipo instalado.',
+        'No hay lecturas que confirmen lluvia en este sector.',
+        'Consulta el camino antes de bajar al valle.'
       ]
     },
     {
@@ -57,20 +59,21 @@ function buildInitialState() {
       station_id: 'SJM-ELMANZANO-01',
       name: 'El Manzano',
       quebrada: null,
-      rainfall_mm: 1.0,
-      minutesAgo: 8,
-      measuredAt: ahora - 8 * 60000,
-      lastObserverAt: ahora - 8 * 60000,
-      timeText: null,
-      hasSensor: true,
-      sensorStatus: 'Equipo LoRa activo · batería 91 %',
-      observerCount24h: 2,
-      lastObserverHour: 'hoy a las 09:34',
-      hourly24h: [0,0,0,0,0,0,0,0,0,0,0,0,0.1,0.2,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.9,1.0],
+      rainfall_mm: null,
+      minutesAgo: null,
+      measuredAt: null,
+      lastObserverAt: null,
+      timeText: 'equipo no instalado',
+      hasSensor: false,
+      sensorStatus: 'Equipo no instalado todavía',
+      observerCount24h: 0,
+      lastObserverHour: 'sin lecturas hoy',
+      hourly24h: [null, null, null, null, null, null, null, null, null, null, null, null,
+                  null, null, null, null, null, null, null, null, null, null, null, null],
       actions: [
-        'Lluvia baja en el sector por ahora.',
-        'Conduzca con precaución por agua en la calzada.',
-        'Revise si sube la lluvia en los sectores altos.'
+        'El punto todavía no tiene equipo instalado.',
+        'Una lectura manual acreditada puede activar el semáforo.',
+        'El tablero no reemplaza las alertas oficiales.'
       ]
     },
     {
@@ -78,20 +81,21 @@ function buildInitialState() {
       station_id: 'SJM-ELCANELO-01',
       name: 'El Canelo',
       quebrada: null,
-      rainfall_mm: 0.4,
-      minutesAgo: 26,
-      measuredAt: ahora - 26 * 60000,
-      lastObserverAt: ahora - 26 * 60000,
-      timeText: null,
-      hasSensor: true,
-      sensorStatus: 'Equipo LoRa activo · batería 72 %',
-      observerCount24h: 1,
-      lastObserverHour: 'hoy a las 09:16',
-      hourly24h: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.1,0.1,0.2,0.2,0.2,0.3,0.3,0.4,0.4],
+      rainfall_mm: null,
+      minutesAgo: null,
+      measuredAt: null,
+      lastObserverAt: null,
+      timeText: 'equipo no instalado',
+      hasSensor: false,
+      sensorStatus: 'Equipo no instalado todavía',
+      observerCount24h: 0,
+      lastObserverHour: 'sin lecturas hoy',
+      hourly24h: [null, null, null, null, null, null, null, null, null, null, null, null,
+                  null, null, null, null, null, null, null, null, null, null, null, null],
       actions: [
-        'Casi no ha llovido en El Canelo.',
-        'Si sube hacia el valle, consulte los tramos altos.',
-        'Recuerde que el tablero no reemplaza alertas oficiales.'
+        'El punto todavía no tiene equipo instalado.',
+        'No hay datos para afirmar que el sector esté seco.',
+        'Consulta los tramos altos antes de subir.'
       ]
     },
     {
@@ -100,19 +104,20 @@ function buildInitialState() {
       name: 'San Gabriel',
       quebrada: null,
       rainfall_mm: null,
-      minutesAgo: 942,
-      measuredAt: ahora - 942 * 60000,
-      lastObserverAt: ahora - 942 * 60000,
-      timeText: null,
-      hasSensor: true,
-      sensorStatus: 'Sin transmisión desde ayer 18:00',
+      minutesAgo: null,
+      measuredAt: null,
+      lastObserverAt: null,
+      timeText: 'equipo no instalado',
+      hasSensor: false,
+      sensorStatus: 'Equipo no instalado todavía',
       observerCount24h: 0,
-      lastObserverHour: 'ayer a las 18:00',
-      hourly24h: [0,0,0,0,0,0,0,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+      lastObserverHour: 'sin lecturas hoy',
+      hourly24h: [null, null, null, null, null, null, null, null, null, null, null, null,
+                  null, null, null, null, null, null, null, null, null, null, null, null],
       actions: [
-        'No sabemos cuánto está lloviendo en San Gabriel.',
-        'No asuma que está despejado por falta de señal.',
-        'Consulte con Carabineros antes de subir.'
+        'El punto todavía no tiene equipo instalado.',
+        'No asumas que está despejado por falta de datos.',
+        'Consulta con Carabineros antes de subir.'
       ]
     },
     {
@@ -129,9 +134,10 @@ function buildInitialState() {
       sensorStatus: 'Equipo no instalado todavía',
       observerCount24h: 0,
       lastObserverHour: 'sin lecturas hoy',
-      hourly24h: [null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+      hourly24h: [null, null, null, null, null, null, null, null, null, null, null, null,
+                  null, null, null, null, null, null, null, null, null, null, null, null],
       actions: [
-        'Aún no hay pluviómetro instalado en este punto.',
+        'El punto todavía no tiene equipo instalado.',
         'Revise el punto más cercano en El Canelo.',
         'Si es observador acreditado, puede registrar lectura manual.'
       ]
@@ -142,266 +148,96 @@ function buildInitialState() {
   const roads = [
     {
       id: 'plaza-de-armas',
-      updatedAt: ahora - 12 * 60000,
       name: 'Plaza de Armas',
       order: 1,
-      state: 'verde',
-      source: 'Carabineros',
-      timeLabel: 'hoy a las 09:30',
-      note: 'Tránsito habitual por ruta G-25.',
+      updatedAt: null,
+      state: 'sindato',
+      source: 'Sin información',
+      timeLabel: 'sin reporte reciente',
+      note: 'Sin reporte confirmado todavía.',
       pendingReports: 0,
-      todayLog: [
-        { hora: '09:30', state: 'verde', source: 'Carabineros', note: 'Tránsito habitual sin novedades.' },
-        { hora: '07:15', state: 'verde', source: 'Municipalidad', note: 'Inicio de jornada normal.' }
-      ]
+      todayLog: []
     },
     {
       id: 'el-canelo',
-      updatedAt: ahora - 22 * 60000,
       name: 'El Canelo',
       order: 2,
-      state: 'verde',
-      source: 'Municipalidad',
-      timeLabel: 'hoy a las 09:20',
-      note: 'Calzada despejada y húmeda.',
+      updatedAt: null,
+      state: 'sindato',
+      source: 'Sin información',
+      timeLabel: 'sin reporte reciente',
+      note: 'Sin reporte confirmado todavía.',
       pendingReports: 0,
-      todayLog: [
-        { hora: '09:20', state: 'verde', source: 'Municipalidad', note: 'Calzada húmeda, tránsito normal.' }
-      ]
+      todayLog: []
     },
     {
       id: 'el-manzano',
-      updatedAt: ahora - 27 * 60000,
       name: 'El Manzano',
       order: 3,
-      state: 'ambar',
-      source: 'Observadora El Manzano',
-      timeLabel: 'hoy a las 09:15',
-      note: 'Agua en la calzada en curva sur. Transitar lento.',
-      pendingReports: 1,
-      todayLog: [
-        { hora: '09:15', state: 'ambar', source: 'Observadora El Manzano', note: 'Agua en la calzada, confirmado por Directiva.' },
-        { hora: '07:40', state: 'verde', source: 'Municipalidad', note: 'Despejado al amanecer.' }
-      ]
+      updatedAt: null,
+      state: 'sindato',
+      source: 'Sin información',
+      timeLabel: 'sin reporte reciente',
+      note: 'Sin reporte confirmado todavía.',
+      pendingReports: 0,
+      todayLog: []
     },
     {
       id: 'el-melocoton',
-      updatedAt: ahora - 62 * 60000,
       name: 'El Melocotón',
       order: 4,
-      state: 'rojo',
-      source: 'Carabineros',
-      timeLabel: 'hoy a las 08:40',
-      note: 'Tramo San Alfonso — El Melocotón restringido. No hay información sobre cuándo se habilita.',
-      pendingReports: 3,
-      todayLog: [
-        { hora: '08:40', state: 'rojo', source: 'Carabineros', note: 'Restringido entre El Melocotón y San Alfonso. Sin hora de apertura.' },
-        { hora: '07:55', state: 'ambar', source: 'Observador El Melocotón', note: 'Caída de piedras menores en berma.' }
-      ]
+      updatedAt: null,
+      state: 'sindato',
+      source: 'Sin información',
+      timeLabel: 'sin reporte reciente',
+      note: 'Sin reporte confirmado todavía.',
+      pendingReports: 0,
+      todayLog: []
     },
     {
       id: 'san-alfonso',
-      updatedAt: null,
       name: 'San Alfonso',
       order: 5,
+      updatedAt: null,
       state: 'sindato',
-      source: 'Sin información local',
+      source: 'Sin información',
       timeLabel: 'sin reporte reciente',
-      note: 'Sin confirmación dentro del tramo. Acceso desde El Melocotón restringido por Carabineros (08:40).',
-      pendingReports: 2,
-      todayLog: [
-        { hora: '08:40', state: 'sindato', source: 'Directiva', note: 'Sin dato en tramo interno; acceso cortado en El Melocotón.' }
-      ]
+      note: 'Sin reporte confirmado todavía.',
+      pendingReports: 0,
+      todayLog: []
     },
     {
       id: 'san-gabriel',
-      updatedAt: ahora - 942 * 60000,
       name: 'San Gabriel',
       order: 6,
+      updatedAt: null,
       state: 'sindato',
       source: 'Sin información',
-      timeLabel: 'desde ayer 18:00',
-      note: 'Sin reporte confirmado en las últimas horas.',
+      timeLabel: 'sin reporte reciente',
+      note: 'Sin reporte confirmado todavía.',
       pendingReports: 0,
-      todayLog: [
-        { hora: 'Ayer 18:00', state: 'sindato', source: 'Sistema', note: 'Último reporte venció por antigüedad.' }
-      ]
+      todayLog: []
     }
   ];
 
-  const roadChanges = [
-    { createdAt: ahora - 12 * 60000, hora: 'hoy 09:30', tramo: 'Plaza de Armas', state: 'verde', informedBy: 'Carabineros', confirmedBy: 'Directiva' },
-    { createdAt: ahora - 22 * 60000, hora: 'hoy 09:20', tramo: 'El Canelo', state: 'verde', informedBy: 'Municipalidad', confirmedBy: 'Directiva' },
-    { createdAt: ahora - 27 * 60000, hora: 'hoy 09:15', tramo: 'El Manzano', state: 'ambar', informedBy: 'Observadora El Manzano', confirmedBy: 'Directiva' },
-    { createdAt: ahora - 62 * 60000, hora: 'hoy 08:40', tramo: 'El Melocotón', state: 'rojo', informedBy: 'Carabineros', confirmedBy: 'Directiva' },
-    { createdAt: ahora - 107 * 60000, hora: 'hoy 07:55', tramo: 'El Melocotón', state: 'ambar', informedBy: 'Observador El Melocotón', confirmedBy: 'Directiva' },
-    { createdAt: ahora - 122 * 60000, hora: 'hoy 07:40', tramo: 'El Manzano', state: 'verde', informedBy: 'Municipalidad', confirmedBy: 'Directiva' },
-    { createdAt: ahora - 147 * 60000, hora: 'hoy 07:15', tramo: 'Plaza de Armas', state: 'verde', informedBy: 'Municipalidad', confirmedBy: 'Directiva' },
-    { createdAt: ahora - 942 * 60000, hora: 'ayer 18:00', tramo: 'San Gabriel', state: 'sindato', informedBy: 'Observador San Gabriel', confirmedBy: 'Directiva' }
-  ];
+  const roadChanges = [];
 
   /* Lecturas con contrato de datos extendido y coherente (snake_case) */
-  const readings = [
-    {
-      id: 'MV-SJM-0108',
-      station_id: 'san-alfonso',
-      point_name: 'San Alfonso',
-      timestamp: new Date(ahora - 4 * 60000).toISOString(),
-      timeLabel: 'hace 4 min',
-      rainfall_mm: 18.4,
-      estado_lectura: 'medida',
-      temperature_c: 9.8,
-      source: 'manual',
-      metodo: 'manual',
-      instrumento: 'Tubo comunitario #01',
-      verified: true,
-      estado_validacion: 'Validada',
-      observador_id: 'OBS-01',
-      observador_alias: 'Observador San Alfonso',
-      verificado_por: 'Directiva',
-      verificado_en: '2026-11-23T09:40:00-03:00',
-      corrige_a: null,
-      foto: null,
-      confianza: 'alta'
-    },
-    {
-      id: 'MV-SJM-0109',
-      station_id: 'san-alfonso',
-      point_name: 'San Alfonso',
-      timestamp: new Date(ahora - 1 * 60000).toISOString(),
-      timeLabel: 'hace 1 min',
-      rainfall_mm: 21.0,
-      estado_lectura: 'medida',
-      temperature_c: null,
-      source: 'manual',
-      metodo: 'manual',
-      instrumento: 'Tubo comunitario #01',
-      verified: false,
-      estado_validacion: 'En revisión',
-      observador_id: 'OBS-01',
-      observador_alias: 'Observador San Alfonso',
-      verificado_por: null,
-      verificado_en: null,
-      corrige_a: null,
-      foto: 'Foto adjunta del tubo (ejemplo)',
-      confianza: 'media'
-    },
-    {
-      id: 'MV-SJM-0107',
-      station_id: 'el-melocoton',
-      point_name: 'El Melocotón',
-      timestamp: new Date(ahora - 7 * 60000).toISOString(),
-      timeLabel: 'hace 7 min',
-      rainfall_mm: 8.5,
-      estado_lectura: 'medida',
-      temperature_c: null,
-      source: 'manual',
-      metodo: 'manual',
-      instrumento: 'Tubo comunitario #04',
-      verified: false,
-      estado_validacion: 'En revisión',
-      observador_id: 'OBS-04',
-      observador_alias: 'Observador El Melocotón',
-      verificado_por: null,
-      verificado_en: null,
-      corrige_a: null,
-      foto: null,
-      confianza: 'media'
-    },
-    {
-      id: 'MV-SJM-0106',
-      station_id: 'el-manzano',
-      point_name: 'El Manzano',
-      timestamp: new Date(ahora - 8 * 60000).toISOString(),
-      timeLabel: 'hace 8 min',
-      rainfall_mm: 1.0,
-      estado_lectura: 'medida',
-      temperature_c: 11.2,
-      source: 'manual',
-      metodo: 'manual',
-      instrumento: 'Tubo comunitario #02',
-      verified: true,
-      estado_validacion: 'Validada',
-      observador_id: 'OBS-02',
-      observador_alias: 'Observadora El Manzano',
-      verificado_por: 'Directiva',
-      verificado_en: '2026-11-23T09:36:00-03:00',
-      corrige_a: null,
-      foto: null,
-      confianza: 'alta'
-    },
-    {
-      id: 'MV-SJM-0105',
-      station_id: 'el-melocoton',
-      point_name: 'El Melocotón',
-      timestamp: new Date(ahora - 11 * 60000).toISOString(),
-      timeLabel: 'hace 11 min',
-      rainfall_mm: 6.2,
-      estado_lectura: 'medida',
-      temperature_c: 10.4,
-      source: 'automatico',
-      metodo: 'automatico',
-      instrumento: 'Pluviómetro LoRa',
-      verified: true,
-      estado_validacion: 'Validada',
-      observador_id: 'EQUIPO-LORA',
-      observador_alias: 'Equipo El Melocotón',
-      verificado_por: 'Directiva',
-      verificado_en: '2026-11-23T09:32:00-03:00',
-      corrige_a: null,
-      foto: null,
-      confianza: 'alta'
-    },
-    {
-      id: 'MV-SJM-0104',
-      station_id: 'el-canelo',
-      point_name: 'El Canelo',
-      timestamp: new Date(ahora - 26 * 60000).toISOString(),
-      timeLabel: 'hace 26 min',
-      rainfall_mm: 0.4,
-      estado_lectura: 'medida',
-      temperature_c: 12.1,
-      source: 'manual',
-      metodo: 'manual',
-      instrumento: 'Tubo comunitario #05',
-      verified: true,
-      estado_validacion: 'Validada',
-      observador_id: 'OBS-05',
-      observador_alias: 'Observadora El Canelo',
-      verificado_por: 'Directiva',
-      verificado_en: '2026-11-23T09:20:00-03:00',
-      corrige_a: null,
-      foto: null,
-      confianza: 'alta'
-    }
-  ];
+  const readings = [];
 
   /* Avisos ciudadanos pendientes para la cola de Directiva */
-  const citizenReports = [
-    {
-      id: 'AV-001',
-      road_id: 'san-alfonso',
-      tramo: 'San Alfonso',
-      tipo: 'El río viene creciendo',
-      suggested_state: 'rojo',
-      nota: 'Estero San Alfonso trae agua turbia cerca del puente.',
-      hora: 'hoy a las 09:32',
-      createdAt: ahora - 10 * 60000,
-      estado: 'En revisión',
-      source: 'Vecino'
-    }
-  ];
+  const citizenReports = [];
 
   /* Padrón: 8 observadores (6 acreditados, 2 suspendidos), solo alias y los 6 sectores permitidos */
   const observers = [
-    { id: 'OBS-01', lastReadingAt: ahora - 1 * 60000, alias: 'Observador San Alfonso', sector: 'San Alfonso', sector_id: 'san-alfonso', rol: 'observador', estado: 'Acreditado', card: '10042042', pin: '1234', lastReading: 'hoy 09:41', motivoBaja: null },
-    { id: 'OBS-02', lastReadingAt: ahora - 8 * 60000, alias: 'Observadora El Manzano', sector: 'El Manzano', sector_id: 'el-manzano', rol: 'observador', estado: 'Acreditado', card: '10042051', pin: '2222', lastReading: 'hoy 09:34', motivoBaja: null },
-    { id: 'OBS-03', lastReadingAt: ahora - 12 * 60000, alias: 'Directiva', sector: 'Plaza de Armas', sector_id: 'plaza-de-armas', rol: 'directiva', estado: 'Acreditado', card: '90000001', pin: '9999', lastReading: 'hoy 09:30', motivoBaja: null },
-    { id: 'OBS-04', lastReadingAt: ahora - 7 * 60000, alias: 'Observador El Melocotón', sector: 'El Melocotón', sector_id: 'el-melocoton', rol: 'observador', estado: 'Acreditado', card: '10042063', pin: '3333', lastReading: 'hoy 09:35', motivoBaja: null },
-    { id: 'OBS-05', lastReadingAt: ahora - 26 * 60000, alias: 'Observadora El Canelo', sector: 'El Canelo', sector_id: 'el-canelo', rol: 'observador', estado: 'Acreditado', card: '10042074', pin: '4444', lastReading: 'hoy 09:16', motivoBaja: null },
-    { id: 'OBS-06', lastReadingAt: ahora - 942 * 60000, alias: 'Observador San Gabriel', sector: 'San Gabriel', sector_id: 'san-gabriel', rol: 'observador', estado: 'Acreditado', card: '10042085', pin: '5555', lastReading: 'ayer 18:00', motivoBaja: null },
-    { id: 'OBS-07', lastReadingAt: ahora - 12 * 24 * 60 * 60000, alias: 'Observador Plaza de Armas', sector: 'Plaza de Armas', sector_id: 'plaza-de-armas', rol: 'observador', estado: 'Suspendido', card: '10042096', pin: '6666', lastReading: 'hace 12 días', motivoBaja: 'Tarjeta extraviada, en reposición.' },
-    { id: 'OBS-08', lastReadingAt: ahora - 20 * 24 * 60 * 60000, alias: 'Observadora San Alfonso 2', sector: 'San Alfonso', sector_id: 'san-alfonso', rol: 'observador', estado: 'Suspendido', card: '10042099', pin: '7777', lastReading: 'hace 20 días', motivoBaja: 'Cambio temporal de domicilio.' }
+    { id: 'OBS-01', lastReadingAt: null, alias: 'Observador San Alfonso', sector: 'San Alfonso', sector_id: 'san-alfonso', rol: 'observador', estado: 'Acreditado', card: '10042042', pin: '1234', lastReading: 'sin lecturas', motivoBaja: null },
+    { id: 'OBS-02', lastReadingAt: null, alias: 'Observadora El Manzano', sector: 'El Manzano', sector_id: 'el-manzano', rol: 'observador', estado: 'Acreditado', card: '10042051', pin: '2222', lastReading: 'sin lecturas', motivoBaja: null },
+    { id: 'OBS-03', lastReadingAt: null, alias: 'Directiva', sector: 'Plaza de Armas', sector_id: 'plaza-de-armas', rol: 'directiva', estado: 'Acreditado', card: '90000001', pin: '9999', lastReading: 'sin lecturas', motivoBaja: null },
+    { id: 'OBS-04', lastReadingAt: null, alias: 'Observador El Melocotón', sector: 'El Melocotón', sector_id: 'el-melocoton', rol: 'observador', estado: 'Acreditado', card: '10042063', pin: '3333', lastReading: 'sin lecturas', motivoBaja: null },
+    { id: 'OBS-05', lastReadingAt: null, alias: 'Observadora El Canelo', sector: 'El Canelo', sector_id: 'el-canelo', rol: 'observador', estado: 'Acreditado', card: '10042074', pin: '4444', lastReading: 'sin lecturas', motivoBaja: null },
+    { id: 'OBS-06', lastReadingAt: null, alias: 'Observador San Gabriel', sector: 'San Gabriel', sector_id: 'san-gabriel', rol: 'observador', estado: 'Acreditado', card: '10042085', pin: '5555', lastReading: 'sin lecturas', motivoBaja: null },
+    { id: 'OBS-07', lastReadingAt: null, alias: 'Observador Plaza de Armas', sector: 'Plaza de Armas', sector_id: 'plaza-de-armas', rol: 'observador', estado: 'Suspendido', card: '10042096', pin: '6666', lastReading: 'sin lecturas', motivoBaja: 'Tarjeta extraviada, en reposición.' },
+    { id: 'OBS-08', lastReadingAt: null, alias: 'Observadora San Alfonso 2', sector: 'San Alfonso', sector_id: 'san-alfonso', rol: 'observador', estado: 'Suspendido', card: '10042099', pin: '7777', lastReading: 'sin lecturas', motivoBaja: 'Cambio temporal de domicilio.' }
   ];
 
   /* 4 archivos publicados según §15 */
@@ -409,6 +245,28 @@ function buildInitialState() {
   const sampleRowsManual = generateArchiveRows(35, 'Observador acreditado');
 
   const files = [
+    {
+      id: 'f-2',
+      name: 'lecturas_manuales_2026.csv',
+      format: 'CSV',
+      isDefaultFormat: true,
+      rowsCountLabel: '312 filas',
+      updatedLabel: 'actualizado el 14 de noviembre',
+      columnsRecognized: true,
+      publishedAt: null,
+      canUndo: false,
+      summary: { acumulado: 36.8, maxDay: '14 de noviembre (16,0 mm)', rainyDays: 6 },
+      byPoint: [
+        { name: 'San Alfonso', mm: 36.8 },
+        { name: 'El Melocotón', mm: 19.2 },
+        { name: 'El Manzano', mm: 9.5 },
+        { name: 'El Canelo', mm: 5.1 },
+        { name: 'San Gabriel', mm: 12.2 },
+        { name: 'Plaza de Armas', mm: 3.0 }
+      ],
+      byHour: [0,0,0,0,0,0,0.5,1.8,3.2,4.1,2.0,1.2,0.8,0.6,1.1,2.2,3.4,4.8,3.9,2.8,1.9,1.3,0.8,0.4],
+      rows: sampleRowsManual
+    },
     {
       id: 'f-1',
       name: 'lluvia_2026_11.xlsx',
@@ -429,27 +287,6 @@ function buildInitialState() {
       ],
       byHour: [0.4,0.2,0.1,0,0,0,0.3,0.8,1.5,2.4,1.9,1.2,0.9,1.4,2.8,3.6,4.5,5.1,4.2,3.1,2.4,1.8,1.5,1.1],
       rows: sampleRowsNovember
-    },
-    {
-      id: 'f-2',
-      name: 'lecturas_manuales_2026.csv',
-      format: 'CSV',
-      rowsCountLabel: '312 filas',
-      updatedLabel: 'actualizado el 14 de noviembre',
-      columnsRecognized: true,
-      publishedAt: null,
-      canUndo: false,
-      summary: { acumulado: 36.8, maxDay: '14 de noviembre (16,0 mm)', rainyDays: 6 },
-      byPoint: [
-        { name: 'San Alfonso', mm: 36.8 },
-        { name: 'El Melocotón', mm: 19.2 },
-        { name: 'El Manzano', mm: 9.5 },
-        { name: 'El Canelo', mm: 5.1 },
-        { name: 'San Gabriel', mm: 12.2 },
-        { name: 'Plaza de Armas', mm: 3.0 }
-      ],
-      byHour: [0,0,0,0,0,0,0.5,1.8,3.2,4.1,2.0,1.2,0.8,0.6,1.1,2.2,3.4,4.8,3.9,2.8,1.9,1.3,0.8,0.4],
-      rows: sampleRowsManual
     },
     {
       id: 'f-3',
@@ -500,6 +337,9 @@ function buildInitialState() {
     roadRefreshedAt: ahora - 2 * 60000,
     updatedLabel: 'hoy a las 09:42',
     roadMinutesSinceRefresh: 2,
+    myReportIds: [],
+    avisarCooldownUntil: null,
+    lastDailyArchiveDate: null,
     session: null,
     loginAttempts: 0,
     lockoutUntil: null,
@@ -510,7 +350,7 @@ function buildInitialState() {
     citizenReports,
     observers,
     files,
-    activeFileId: 'f-1',
+    activeFileId: 'f-2',
     tablePage: 1
   };
 }

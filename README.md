@@ -15,22 +15,31 @@ en una página que funciona con mala señal y sin instalar nada.
   San José de Maipo.
 
 El equipo trabaja con la junta de vecinos y con observadores acreditados de seis puntos del
-valle: Plaza de Armas, El Canelo, El Manzano, El Melocotón, San Alfonso y San Gabriel. La red
-combina equipos automáticos con tubos comunitarios leídos a mano, y el sitio ordena esa
-información para que cualquier vecino pueda responder tres preguntas: cuánto llovió, cómo está
-el camino y de cuándo es el dato.
+valle: Plaza de Armas, El Canelo, El Manzano, El Melocotón, San Alfonso y San Gabriel. Hoy los
+seis puntos están **sin equipo instalado**: el tablero los muestra como «Equipo no instalado» y
+«Sin dato», sin lecturas ni avisos previos. Cuando se instalen, la red combinará equipos
+automáticos con tubos comunitarios leídos a mano. El sitio ordena esa información para que
+cualquier vecino pueda responder tres preguntas: cuánto llovió, cómo está el camino y de cuándo
+es el dato.
 
 ## Qué resuelve
 
 - **Lluvia al día por punto**, con cuatro estados que combinan forma, palabra y color:
   Normal, Ojo, Peligro y Sin dato. Un punto sin lectura se muestra en gris, nunca en verde.
+  Una medición vale **1 hora (60 minutos)**; pasado ese plazo, el punto pasa a «Sin dato».
 - **Estado de los caminos informado por personas**, con fuente y hora. Un tramo sin reporte
   dice «Sin dato»; no se deduce del clima ni se supone abierto.
 - **Registro y validación del dato comunitario**: el observador entra con su tarjeta, registra
   la lectura del tubo y la directiva la valida antes de que mueva el semáforo.
-- **Archivo abierto**: carga de planillas CSV o XLSX, tablero mensual, tabla filtrable y
-  descarga de los datos publicados.
+- **Archivo abierto**: carga de planillas CSV o XLSX, tablero, tabla filtrable y descarga.
+  El formato predeterminado es **CSV**, el más liviano y usable. Cada jornada cerrada genera
+  sola `lluvia_diaria_AAAA-MM-DD.csv`; la directiva también puede forzar el cierre del día con
+  «Generar cierre de hoy (CSV)».
+- **Avisos vecinales** con enfriamiento de **2 minutos** entre envíos y opción de **cancelar el
+  aviso propio** mientras siga en revisión, tanto en `Avisar algo` como en `Camino › Informar`.
 - **Ingreso oficial** de planillas, equipos automáticos o verificaciones en terreno.
+- **Kiosco de alto contraste** con paleta pizarra-carbón, tarjetas diferenciadas por estado e
+  insignias sólidas.
 
 ## Cómo está hecho
 
@@ -122,18 +131,20 @@ efímero sobre `docs/`, ejecuta las pruebas y lo cierra. Verifica:
 - Layout exacto a 1280×800 y 390×844.
 - Barrido de todas las vistas sin textos bajo 16 px ni controles bajo 56 px.
 - Rutas protegidas, bloqueo tras tres fallos, lectura de observador, validación y corrección,
-  ingreso oficial, puntos, carga de históricos, borradores, deshacer y kiosco.
+  ingreso oficial, puntos, carga de históricos, borradores, deshacer, cierre diario CSV,
+  cooldown y cancelación de avisos, y paleta del kiosco.
 - Cero excepciones JS y cero diálogos nativos durante el recorrido.
 
 Termina con código 0 si todo pasa.
 
 ## Datos de ejemplo y límites
 
-- Las cifras que trae el sitio —18,4 mm en San Alfonso, camino restringido por Carabineros—
-  son **de demostración**. El pie del sitio dice «Datos de ejemplo» mientras no haya una base
-  de datos conectada.
+- El tablero parte **sin datos de terreno**: los seis puntos dicen «Equipo no instalado» y
+  «Sin dato», los caminos no tienen reporte y no hay lecturas ni avisos previos.
+- Los cuatro archivos que aparecen en Archivo son **de ejemplo**, para mostrar el tablero y la
+  tabla. El pie del sitio dice «Datos de ejemplo» mientras no haya una base conectada.
 - Los umbrales de 5 y 15 mm por hora son **provisionales**, a la espera de acordarlos con
-  Sernageomin.
+  Sernageomin. La vigencia del dato es de 1 hora.
 - Solo San Alfonso tiene una quebrada documentada (Estero San Alfonso). Las demás zonas no
   tienen un nombre de quebrada asignado.
 - El semáforo es **apoyo comunitario**: no avisa de aluviones ni reemplaza a SENAPRED,

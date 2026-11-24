@@ -23,8 +23,9 @@ espera están en `esquema.sql`.
 4. Revisar en **Table Editor** que existan `mv_puntos`, `mv_tramos`, `mv_lecturas`,
    `mv_observadores`, `mv_sesiones` y `mv_estado_snapshot`.
 
-El script crea seis puntos, seis tramos y tres tarjetas de ejemplo. **Cambiar las claves de esas
-tarjetas antes de publicar** (ver §6).
+El script crea seis puntos **sin equipo instalado** (`tiene_sensor = false`, estado «Equipo no
+instalado todavía»), seis tramos sin reporte y tres tarjetas de ejemplo. **Cambiar las claves de
+esas tarjetas antes de publicar** (ver §6).
 
 ## 3. Copiar las llaves
 
@@ -108,6 +109,19 @@ Nunca se guarda el número de tarjeta ni la clave en texto plano.
 
 `mv_lecturas.mm` acepta `NULL` para representar «Sin dato»: una lectura sin dato no es un cero.
 
+### Estado inicial y vigencia
+
+- Los seis puntos parten como «Equipo no instalado» y «Sin dato», sin lecturas ni avisos
+  previos. Así se ve el tablero hasta que exista una medición válida.
+- Una medición vale **1 hora (60 minutos)**. Pasado ese plazo, el punto vuelve a «Sin dato»;
+  el cálculo lo hace el cliente con los umbrales de `datos/config.js`.
+- Los cierres diarios en **CSV** (`lluvia_diaria_AAAA-MM-DD.csv`) los arma el cliente y viajan
+  dentro del snapshot que publica la directiva. No hay una tabla aparte para ellos.
+- El enfriamiento de **2 minutos** entre avisos y la cancelación del aviso propio son estado
+  del cliente (`avisarCooldownUntil`, `myReportIds`); no reemplazan un límite por IP en el
+  servidor.
+- La paleta pizarra-carbón del kiosco es solo presentación y no cambia el contrato de datos.
+
 ## 8. Publicar el tablero
 
 El sitio es estático: no necesita servidor propio, solo GitHub Pages sobre `docs/`.
@@ -115,7 +129,8 @@ El sitio es estático: no necesita servidor propio, solo GitHub Pages sobre `doc
 1. Entrar como directiva.
 2. Validar o ingresar lecturas.
 3. En **Directiva → Datos**, confirmar que el estado es «Supabase» y usar «Sincronizar ahora».
-4. Al guardar, el sitio publica el estado completo en `mv_estado_snapshot`.
+4. Al guardar, el sitio publica el estado completo en `mv_estado_snapshot`, incluidos los
+   cierres diarios CSV que haya generado el cliente.
 
 El tablero público lee ese snapshot, no consulta las tablas una por una. Es deliberado: la
 página queda rápida, funciona con mala señal y el JSON tiene exactamente la forma que el sitio
@@ -125,7 +140,9 @@ sabe dibujar.
 
 - [ ] Cambiar las claves de las tres tarjetas de ejemplo.
 - [ ] Borrar o suspender las tarjetas que no correspondan.
-- [ ] Definir los umbrales con Sernageomin y actualizarlos en `datos/config.js`.
+- [ ] Instalar los equipos y marcar cada punto con su sensor cuando corresponda.
+- [ ] Definir los umbrales y la vigencia de 1 hora con Sernageomin, y actualizarlos en
+  `datos/config.js`.
 - [ ] Probar en el teléfono: entrar, registrar, validar, subir un archivo.
 - [ ] Guardar un respaldo (**Directiva → Datos → Descargar**).
 - [ ] Activar respaldos automáticos de Supabase o programar un `pg_dump`.

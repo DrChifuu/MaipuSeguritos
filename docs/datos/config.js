@@ -7,7 +7,7 @@ window.MV_CONFIG = {
 
   /* Versión del formato de datos. Si cambia la forma del estado, subir el número:
      el sitio descarta lo guardado y vuelve a la semilla. */
-  version: '2.3.0',
+  version: '2.4.0',
 
   /* Clave con la que se guarda el estado en el navegador. */
   clave: 'maipo_vigia_estado_v2',
@@ -25,12 +25,18 @@ window.MV_CONFIG = {
     red1h: 15.0,
     amber3h: 15.0,
     red3h: 30.0,
-    staleMinutes: 30,
-    ventanaTableroMin: 90,
+    staleMinutes: 60,
+    ventanaTableroMin: 60,
     status: 'provisional',
     validatedBy: null,
     version: '0.1-provisional'
   },
+
+  /* Formato de dataset predeterminado: CSV, el más liviano y usable. */
+  formatoDataset: 'CSV',
+
+  /* Dos minutos de espera entre avisos, para evitar spam. */
+  cooldownAvisoSeg: 120,
 
   /* --------------------------------------------------------------------------
      SUPABASE (fase 2). Mientras url y anonKey estén vacíos, el sitio es local.

@@ -467,11 +467,96 @@ async function pruebasE2E(cdp, base) {
     }
   });
 
+  await prueba('Cooldown de avisos y cancelación del aviso propio', async () => {
+    await e.reiniciar();
+    await e.clic('#btnAvisarFromAhora');
+    await cdp.esperar(`!document.getElementById('sheetBackdrop').classList.contains('hidden')`);
+
+    await e.clic('#btnSendAvisar');
+    await pausa(300);
+    const trasEnviar = await e.estado();
+    const propio = trasEnviar.citizenReports.find(a => a.esMio === true);
+    verdad(propio, 'el aviso no quedó marcado como propio');
+    verdad(trasEnviar.myReportIds.includes(propio.id), 'el aviso no entró en myReportIds');
+    verdad(trasEnviar.avisarCooldownUntil > Date.now(), 'no se activó el cooldown');
+    verdad(await cdp.evaluar(`!!document.querySelector('#avisarCooldownCountdown[data-live-cooldown]')`), 'falta la cuenta regresiva');
+    verdad(await cdp.evaluar(`!!document.querySelector('[data-cancel-report]')`), 'falta el botón para cancelar');
+
+    await e.clic('#btnCloseAvisarDone');
+    await e.clic('#btnAvisarFromAhora');
+    await cdp.esperar(`!!document.getElementById('btnSendAvisar')`);
+    verdad(await cdp.evaluar(`document.getElementById('btnSendAvisar').disabled`), 'el botón no quedó deshabilitado');
+
+    const c1 = (await e.texto('#avisarCooldownCountdown')).trim();
+    await pausa(2300);
+    const c2 = (await e.texto('#avisarCooldownCountdown')).trim();
+    verdad(c2 !== c1, 'la cuenta regresiva no avanzó: ' + c1 + ' → ' + c2);
+
+    await e.clic('[data-cancel-report]');
+    await pausa(300);
+    const trasCancelar = await e.estado();
+    const cancelado = trasCancelar.citizenReports.find(a => a.id === propio.id);
+    igual(cancelado.estado, 'Cancelado', 'estado del aviso cancelado');
+    const tramo = trasCancelar.roads.find(r => r.id === propio.road_id);
+    igual(tramo.pendingReports, 0, 'pendientes del tramo tras cancelar');
+    verdad(trasCancelar.avisarCooldownUntil > Date.now(), 'el cooldown no debe liberarse al cancelar');
+    verdad(await cdp.evaluar(`!document.querySelector('[data-cancel-report]')`), 'el aviso cancelado sigue en la hoja');
+
+    /* Al vencer el cooldown, el botón se habilita solo. */
+    await cdp.evaluar(`(() => {
+      window.__realNow = Date.now;
+      const base = Date.now();
+      Date.now = () => base + 121000;
+      document.dispatchEvent(new Event('visibilitychange'));
+      return true;
+    })()`);
+    await pausa(500);
+    verdad(await cdp.evaluar(`!document.querySelector('#avisarCooldownCountdown')`), 'la franja de cooldown no desapareció');
+    verdad(await cdp.evaluar(`document.getElementById('btnSendAvisar') && !document.getElementById('btnSendAvisar').disabled`), 'el botón no se habilitó al vencer');
+    verdad((await e.estado()).avisarCooldownUntil === null, 'el cooldown no se limpió');
+    await cdp.evaluar(`(() => { if (window.__realNow) { Date.now = window.__realNow; delete window.__realNow; } return true; })()`);
+    await e.clic('#btnCloseSheet').catch(() => {});
+
+    /* El mismo control existe en Camino › Informar. */
+    await e.reiniciar();
+    await e.abrirTab('camino');
+    await e.abrirSub('informar');
+    await e.clic('#btnSendInform');
+    await pausa(300);
+    await e.clic('#btnInformReset');
+    await cdp.esperar(`!!document.getElementById('btnSendInform')`);
+    verdad(await cdp.evaluar(`!!document.querySelector('#avisarCooldownCountdown[data-live-cooldown]')`), 'falta el cooldown en Camino › Informar');
+    verdad(await cdp.evaluar(`document.getElementById('btnSendInform').disabled`), 'el botón de camino no quedó deshabilitado');
+    verdad(await cdp.evaluar(`!!document.querySelector('[data-cancel-report]')`), 'falta el aviso propio en Camino › Informar');
+    await e.clic('[data-cancel-report]');
+    await pausa(250);
+    igual((await e.estado()).citizenReports.find(a => a.esMio === true).estado, 'Cancelado', 'cancelación desde Camino');
+  });
+
   await prueba('Kiosco: reloj, paginación, flechas y cierre con Escape', async () => {
     await e.clic('#btnFooterKiosco');
     await cdp.esperar(`!document.getElementById('kioscoOverlay').classList.contains('hidden')`);
     const reloj = (await e.texto('#kioscoClock')).trim();
     const pie = (await e.texto('#kioscoFootMode')).trim();
+    const fondoKiosco = await cdp.evaluar(`getComputedStyle(document.getElementById('kioscoOverlay')).backgroundColor`);
+    igual(fondoKiosco, 'rgb(11, 17, 23)', 'fondo pizarra del kiosco');
+    const insignias = await cdp.evaluar(`[...document.querySelectorAll('.k-badge')].map(b => b.className)`);
+    igual(insignias.length, 3, 'insignias de estado del kiosco');
+    verdad(insignias.every(c => /k-badge-(rojo|ambar|verde|sindato)/.test(c)), 'insignia sin clase de estado: ' + insignias.join(', '));
+    const estiloBadge = await cdp.evaluar(`(() => {
+      const b = document.querySelector('.k-badge');
+      const c = getComputedStyle(b);
+      return { fondo: c.backgroundColor, tamano: c.fontSize };
+    })()`);
+    igual(estiloBadge.fondo, 'rgb(203, 213, 225)', 'fondo de insignia sin dato');
+    igual(estiloBadge.tamano, '24px', 'tamaño de insignia');
+    const bordeTarjeta = await cdp.evaluar(`getComputedStyle(document.querySelector('.kiosco-card')).borderTopWidth`);
+    igual(bordeTarjeta, '10px', 'borde superior de tarjeta de kiosco');
+    const ajusteKiosco = await cdp.evaluar(`(() => {
+      const g = document.getElementById('kioscoGrid');
+      return { scroll: g.scrollHeight, client: g.clientHeight };
+    })()`);
+    verdad(ajusteKiosco.scroll <= ajusteKiosco.client + 2, 'el kiosco desborda: ' + JSON.stringify(ajusteKiosco));
     verdad(reloj.length > 8, 'reloj vacío o muy corto');
     verdad(/\d.?–?\d*.?de \d+/.test(pie) || /puntos? · al día/.test(pie), 'indicador de página inesperado: ' + pie);
     await cdp.evaluar(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))`);
@@ -602,18 +687,34 @@ async function pruebasE2E(cdp, base) {
   });
 
   await prueba('Una estación pasa de Normal a Sin dato al vencer su frescura', async () => {
+    await e.reiniciar();
+    await e.login('90000001', '9999');
+    await e.abrirTab('directiva');
+    await e.abrirSub('oficial');
+    await cdp.evaluar(`(() => {
+      const sel = document.getElementById('ofPunto');
+      sel.value = 'el-manzano';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    })()`);
+    await e.escribir('#ofMm', '1,0');
+    await e.clic('#btnGuardarOficial');
+    await pausa(250);
+
+    await e.abrirTab('ahora');
+    await e.abrirSub('lluvia');
     const estadoCard = async () => cdp.evaluar(`(() => {
       const card = [...document.querySelectorAll('.rain-card')]
         .find(c => (c.querySelector('.rain-point-name') || {}).textContent === 'El Manzano');
       return card ? card.querySelector('.state-pill').textContent.trim() : '';
     })()`);
     const antes = await estadoCard();
-    verdad(/Normal/.test(antes), 'El Manzano no partió en Normal: ' + antes);
+    verdad(/Normal/.test(antes), 'El Manzano no quedó en Normal tras el ingreso: ' + antes);
 
     await cdp.evaluar(`(() => {
       window.__realNow = Date.now;
       const base = Date.now();
-      Date.now = () => base + 40 * 60000;
+      Date.now = () => base + 70 * 60000;
       document.dispatchEvent(new Event('visibilitychange'));
       return true;
     })()`);
@@ -653,12 +754,33 @@ async function pruebasE2E(cdp, base) {
 
   await prueba('Directiva valida y corrige sin falsear hasSensor', async () => {
     await e.reiniciar();
+
+    /* Dos lecturas manuales del observador de San Alfonso. */
+    await e.login('10042042', '1234');
+    const registrar = async (mm) => {
+      await e.abrirTab('registrar');
+      await e.abrirSub('lectura');
+      await e.clic('#btnRegNoRead');
+      for (const tecla of String(mm).split('')) {
+        await e.clic(`#regNumpad [data-numkey="${tecla === '.' ? ',' : tecla}"]`);
+      }
+      await e.clic('#btnRegNext2');
+      await cdp.esperar(`!!document.getElementById('btnRegSubmit')`);
+      await e.clic('#btnRegSubmit');
+      await pausa(220);
+    };
+    await registrar('4.5');
+    await e.clic('#btnRegAnother');
+    await registrar('2.5');
+    await e.clic('#btnLogoutTop');
+    await pausa(150);
+
     await e.login('90000001', '9999');
     await cdp.esperar(`location.hash === '#/directiva/validar'`);
     await e.clic('[data-val-filter="lluvia"]');
     const antes = await e.estado();
     const pendiente = antes.readings.find((r) => r.estado_validacion === 'En revisión');
-    verdad(pendiente, 'no hay lectura pendiente en la semilla');
+    verdad(pendiente, 'no hay lectura pendiente tras el registro');
     const estacionAntes = antes.stations.find((s) => s.id === pendiente.station_id);
 
     await e.clic('#btnValApprove');
@@ -670,7 +792,6 @@ async function pruebasE2E(cdp, base) {
     igual(estacionDespues.rainfall_mm, pendiente.rainfall_mm, 'cifra del tablero');
     igual(estacionDespues.hasSensor, estacionAntes.hasSensor, 'hasSensor no debe cambiar');
 
-    /* Corregir la siguiente lectura pendiente. */
     await e.clic('[data-val-filter="lluvia"]');
     await e.clic('#btnValCorrect');
     await e.escribir('#valCorrectInput', '2,5');
@@ -691,6 +812,62 @@ async function pruebasE2E(cdp, base) {
     igual(est.readings[0].rainfall_mm, 3.3, 'cifra oficial');
     const estacion = est.stations.find((s) => s.id === est.readings[0].station_id);
     igual(estacion.rainfall_mm, 3.3, 'tablero tras ingreso oficial');
+  });
+
+  await prueba('Ventana de 1 hora y cierre diario en CSV', async () => {
+    await e.reiniciar();
+    await e.login('90000001', '9999');
+
+    await e.abrirTab('directiva');
+    await e.abrirSub('oficial');
+    await cdp.evaluar(`(() => {
+      const sel = document.getElementById('ofPunto');
+      sel.value = 'el-manzano';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    })()`);
+    await e.escribir('#ofMm', '1,0');
+    await e.clic('#btnGuardarOficial');
+    await pausa(250);
+
+    await e.abrirTab('archivo');
+    await e.abrirSub('archivos');
+    const textoArchivo = await e.texto('#mainContent');
+    verdad(/Formato predeterminado: CSV/.test(textoArchivo), 'no se anuncia CSV como predeterminado');
+    const antesCierre = await e.estado();
+    igual(antesCierre.files[0].id, 'f-2', 'el CSV de ejemplo debe ir primero');
+    verdad(antesCierre.files[0].isDefaultFormat === true, 'f-2 debe estar marcado como predeterminado');
+    verdad(await cdp.evaluar(`!!document.getElementById('btnGenerateDailyCsv')`), 'falta el botón de cierre diario');
+
+    await e.clic('#btnGenerateDailyCsv');
+    await pausa(350);
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+    const conCierre = await e.estado();
+    const diario = conCierre.files.find(f => f.autoDaily && f.dailyDate === hoy);
+    verdad(diario, 'no se generó el dataset diario');
+    igual(diario.format, 'CSV', 'formato del cierre');
+    igual(diario.name, 'lluvia_diaria_' + hoy + '.csv', 'nombre del cierre');
+    verdad(diario.rows.length >= 1, 'el cierre quedó sin filas');
+
+    /* Una lectura de hace 61 minutos no debe mover el tablero. */
+    await e.abrirTab('directiva');
+    await e.abrirSub('oficial');
+    const antes = (await e.estado()).stations.find(s => s.id === 'el-manzano').rainfall_mm;
+    const horaVieja = await cdp.evaluar(`new Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(Date.now() - 61 * 60000))`);
+    await cdp.evaluar(`(() => {
+      const sel = document.getElementById('ofPunto');
+      sel.value = 'el-manzano';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    })()`);
+    await e.escribir('#ofHora', horaVieja);
+    await e.escribir('#ofMm', '9,9');
+    await e.clic('#btnGuardarOficial');
+    await pausa(300);
+    const despues = (await e.estado()).stations.find(s => s.id === 'el-manzano').rainfall_mm;
+    igual(despues, antes, 'el tablero no debe cambiar con una lectura vieja');
+    const aviso = await e.texto('#toastBox');
+    verdad(/una hora/.test(aviso), 'el aviso no menciona la hora: ' + aviso);
   });
 
   await prueba('Crear, editar y quitar un punto con hoja de confirmación', async () => {

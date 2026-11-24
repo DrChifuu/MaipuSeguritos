@@ -41,6 +41,12 @@ Contacto, kiosco y ayuda también están en el pie. La barra superior permite ag
 con **A+**; el modo Kiosco se abre desde el pie y se cierra con cinco toques en la marca o con
 `Escape`.
 
+### Estado inicial
+
+Los seis puntos parten **sin equipo instalado**: se muestran como «Equipo no instalado» y «Sin
+dato», sin lecturas ni avisos previos. Los seis tramos de camino tampoco tienen reporte. El
+archivo trae cuatro planillas de ejemplo para mostrar el tablero y la tabla.
+
 ## Roles y tarjetas
 
 - **Público:** ve lluvia, caminos, archivos y ayuda; puede avisar algo sin registrarse.
@@ -66,15 +72,16 @@ validación ocurre en el navegador; sirve para demostrar el flujo, no para prote
 ## Qué puede hacer el sitio
 
 - **Semáforo con cuatro estados** (Normal, Ojo, Peligro, Sin dato) y cifras que siempre dicen
-  hace cuánto se midieron. Los tiempos («hace 4 min», «hace 15 horas», «Actualizado ahora») y
+  hace cuánto se midieron. Una medición vale **1 hora (60 minutos)**; al superar ese plazo, el
+  punto pasa a «Sin dato». Los tiempos («hace 4 min», «hace 15 horas», «Actualizado ahora») y
   la cuenta regresiva del bloqueo avanzan solos, sin recargar ni mover el foco.
 - **Registro de lecturas** con teclado numérico, límite de 0 a 300 mm y un decimal, lectura
   atrasada de hasta 7 días y foto comprimida en el mismo navegador.
 - **Validación de a una lectura**: validar, corregir (crea una fila nueva y conserva la
   original) o rechazar con motivo. El semáforo público solo se mueve con datos validados.
 - **Ingreso oficial** de planillas, equipos automáticos o verificaciones en terreno. Si la
-  medición es reciente, actualiza el tablero; si es más antigua, queda en el historial y la
-  pantalla lo dice.
+  medición tiene hasta 1 hora, actualiza el tablero; si es más antigua, queda en el historial y
+  la pantalla lo dice.
 - **Puntos de medición**: crear, editar y quitar; un punto nuevo crea también su tramo de
   camino. Las acciones destructivas usan una hoja de confirmación, nunca `window.confirm`.
 - **Observadores**: alta con tarjeta y clave aleatorias, y reposición de clave o de tarjeta
@@ -89,9 +96,16 @@ validación ocurre en el navegador; sirve para demostrar el flujo, no para prote
   - Resumen real: acumulado, día más lluvioso, días con lluvia, por punto y por hora.
   - Publicación con 24 horas para deshacerla.
 - **Archivo**: tablero, tabla filtrable por punto y texto, mapeo de columnas cuando el archivo
-  no trae los nombres del proyecto, y descarga en CSV con BOM.
+  no trae los nombres del proyecto, y descarga en CSV con BOM. El formato predeterminado es
+  **CSV**, el más liviano y usable. Cada jornada cerrada genera sola
+  `lluvia_diaria_AAAA-MM-DD.csv`; la directiva también puede forzar el cierre del día con
+  «Generar cierre de hoy (CSV)».
+- **Avisos vecinales**: en `Avisar algo` y en `Camino › Informar` hay un enfriamiento de **2 minutos** entre envíos, con cuenta regresiva en vivo. Mientras el aviso propio siga en
+  revisión se puede **cancelar**; al hacerlo desaparece de la cola y del contador de pendientes,
+  sin liberar el enfriamiento.
 - **Kiosco**: estaciones ordenadas por gravedad, tres por página, cambio cada 15 segundos,
-  flechas del teclado, reloj con la fecha de Chile e indicador de página.
+  flechas del teclado, reloj con la fecha de Chile e indicador de página. Usa una paleta
+  pizarra-carbón de alto contraste, con tarjetas e insignias diferenciadas por estado.
 - **Accesibilidad y layout**: alto fijo, sin scroll en Ahora › Lluvia a 1280×800; textos desde
   16 px; controles desde 56 px; foco atrapado en las hojas laterales; flechas entre pestañas y
   solapas; enlace para saltar al contenido.
@@ -104,7 +118,7 @@ Todo lo que se registra, valida o carga queda en ese navegador.
 - **Respaldo:** Directiva → Datos → Descargar. Genera un JSON con puntos, caminos, lecturas,
   observadores y archivos.
 - **Restaurar:** Directiva → Datos → Cargar. Reemplaza el estado completo.
-- **Volver al ejemplo:** Directiva → Datos → Restaurar ejemplo.
+- **Volver al estado inicial:** Directiva → Datos → Restaurar ejemplo (deja los puntos sin equipo y sin lecturas).
 - **Versión del formato:** `datos/config.js` sella cada guardado. Si cambia la versión, el sitio
   descarta el estado viejo y vuelve a la semilla.
 
@@ -118,8 +132,10 @@ el mismo saneamiento otra vez antes de guardar el snapshot.
 
 - `version`: versión del formato del estado.
 - `zonaHoraria`: `America/Santiago`; todas las fechas y horas se calculan con ella.
-- `umbrales`: 5 y 15 mm por hora, 30 minutos de frescura y 90 minutos de ventana del tablero,
+- `umbrales`: 5 y 15 mm por hora, 60 minutos (1 hora) de frescura y de ventana del tablero,
   además del estado `provisional` y su versión.
+- `formatoDataset`: `CSV`, el formato predeterminado de la plataforma.
+- `cooldownAvisoSeg`: 120 segundos entre avisos de un mismo vecino.
 - `supabase`: URL y clave pública `anon`.
 - `auth.modo`: `local` o `supabase`.
 
@@ -146,12 +162,14 @@ node tests/verificar.mjs
 
 La suite usa Node estándar y Obscura por CDP (`ws://127.0.0.1:9222`), levanta un servidor
 efímero sobre `docs/` y comprueba unidades del almacén, layout a 1280×800 y 390×844, barrido de
-vistas, flujos de sesión, validación, puntos, históricos y kiosco, además de excepciones JS y
-diálogos nativos.
+vistas, flujos de sesión, validación, puntos, históricos, cierre diario CSV, cooldown y
+cancelación de avisos, paleta del kiosco, además de excepciones JS y diálogos nativos.
 
 ## Datos de ejemplo
 
-Las cifras —18,4 mm en San Alfonso, camino restringido por Carabineros— son de demostración.
-La franja del pie dice «Datos de ejemplo» mientras el sitio esté en modo local. Los umbrales
-son provisionales y se acuerdan con Sernageomin. El semáforo es apoyo comunitario: **no avisa
-de aluviones ni reemplaza a SENAPRED, Carabineros ni Bomberos**.
+El tablero parte sin datos de terreno: los seis puntos dicen «Equipo no instalado» y «Sin
+dato», y los caminos no tienen reporte. Las cuatro planillas de Archivo son de ejemplo, para
+mostrar el tablero y la tabla; la franja del pie dice «Datos de ejemplo» mientras el sitio esté
+en modo local. Los umbrales son provisionales y se acuerdan con Sernageomin; la vigencia del
+dato es de 1 hora. El semáforo es apoyo comunitario: **no avisa de aluviones ni reemplaza a
+SENAPRED, Carabineros ni Bomberos**.

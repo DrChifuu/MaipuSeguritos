@@ -33,6 +33,13 @@
       --rojo-claro: #F4A794;
       --pantalla-suave: #AEC3C9;
 
+      /* Kiosco de alto contraste (pizarra-carbón) */
+      --kiosco-bg: #0B1117;
+      --kiosco-bar: #111A24;
+      --kiosco-bar-border: #2B3B4E;
+      --kiosco-card-bg: #18222F;
+      --kiosco-border-focus: #E6F4F8;
+
       /* Tipografía local / sistema sin CDN */
       --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
       --font-serif: 'Spectral', Georgia, 'Times New Roman', serif;
@@ -1142,7 +1149,7 @@
       position: fixed;
       inset: 0;
       z-index: 300;
-      background-color: var(--pantalla);
+      background-color: var(--kiosco-bg);
       color: #FFFFFF;
       display: flex;
       flex-direction: column;
@@ -1159,8 +1166,10 @@
       align-items: center;
       justify-content: space-between;
       gap: 20px;
-      border-bottom: 2px solid var(--pantalla-alta);
-      padding-bottom: 16px;
+      background-color: var(--kiosco-bar);
+      border: 2px solid var(--kiosco-bar-border);
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
     }
 
     .kiosco-brand {
@@ -1188,8 +1197,9 @@
     }
 
     .kiosco-card {
-      background-color: var(--pantalla-alta);
-      border: 3px solid var(--pantalla-suave);
+      background-color: var(--kiosco-card-bg);
+      border: 3px solid #64748B;
+      border-top-width: 10px;
       border-radius: var(--radius-lg);
       padding: 28px;
       display: flex;
@@ -1197,11 +1207,29 @@
       justify-content: space-between;
     }
     .kiosco-card.k-focus {
-      border-width: 6px;
+      outline: 4px solid var(--kiosco-border-focus);
+      outline-offset: 2px;
     }
-    .kiosco-card.k-rojo { border-color: var(--rojo-claro); }
-    .kiosco-card.k-ambar { border-color: var(--ambar-claro); }
-    .kiosco-card.k-verde { border-color: var(--verde-claro); }
+    .kiosco-card.k-rojo {
+      background-color: #2B1418;
+      border-color: #FF6B6B;
+      border-top-color: #FF5252;
+    }
+    .kiosco-card.k-ambar {
+      background-color: #2A2010;
+      border-color: #F6B93B;
+      border-top-color: #F6B93B;
+    }
+    .kiosco-card.k-verde {
+      background-color: #10261E;
+      border-color: #4ADE80;
+      border-top-color: #22C55E;
+    }
+    .kiosco-card.k-sindato {
+      background-color: #1A2330;
+      border-color: #7C8EA3;
+      border-top-color: #64748B;
+    }
 
     .kiosco-num {
       font-family: var(--font-serif);
@@ -1211,20 +1239,36 @@
       margin: 12px 0;
     }
 
-    .k-text-rojo { color: var(--rojo-claro); }
-    .k-text-ambar { color: var(--ambar-claro); }
-    .k-text-verde { color: var(--verde-claro); }
-    .k-text-sindato { color: var(--pantalla-suave); }
+    .k-text-rojo { color: #FFD2CC; }
+    .k-text-ambar { color: #FFE7AD; }
+    .k-text-verde { color: #C8F7DC; }
+    .k-text-sindato { color: #E2E8F0; }
+
+    .k-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .k-badge-rojo { background-color: #FF8A80; color: #0B1117; }
+    .k-badge-ambar { background-color: #FAD375; color: #0B1117; }
+    .k-badge-verde { background-color: #6EE7B7; color: #0B1117; }
+    .k-badge-sindato { background-color: #CBD5E1; color: #0B1117; }
 
     .kiosco-foot {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      border-top: 2px solid var(--pantalla-alta);
-      padding-top: 14px;
+      background-color: var(--kiosco-bar);
+      border: 2px solid var(--kiosco-bar-border);
+      border-radius: var(--radius-lg);
+      padding: 14px 18px;
       font-size: 22px;
-      color: var(--pantalla-suave);
+      color: #CBD5E1;
     }
 
     /* Utilidades de diseño */
