@@ -1,13 +1,13 @@
 # Maipo Vigía — sitio del tablero comunitario
 
-Tablero de lluvia y caminos del Cajón del Maipo, con pestañas, ingreso por tarjeta y archivos
-históricos. Es una página estática: se abre con doble clic o desde GitHub Pages, sin servidor
-propio.
+Tablero de lluvia y caminos del Cajón del Maipo. Es una página estática: se abre con doble
+clic o desde GitHub Pages, sin servidor propio ni dependencias externas.
 
 ## Cómo abrirlo
 
 - **En el computador:** abrir `index.html` con el navegador. Funciona sin internet.
-- **Publicado:** la carpeta `docs/` del repositorio se sirve como sitio en GitHub Pages.
+- **Publicado:** la carpeta `docs/` del repositorio se sirve en
+  <https://drchifuu.github.io/MaipuSeguritos/>.
 
 ## Qué hay dentro
 
@@ -17,11 +17,14 @@ assets/maipo.css      todo el estilo, sin dependencias externas
 assets/maipo.js       pantallas y comportamiento
 assets/almacen.js     la puerta de los datos: local hoy, Supabase cuando se configure
 assets/fuentes/       IBM Plex Sans y Spectral, locales
-datos/config.js       configuración: modo local, url y clave de Supabase
-datos/semilla.js      los seis puntos, caminos, observadores y archivos de ejemplo
-supabase/esquema.sql  tablas, políticas y funciones para la fase 2
+datos/config.js       versión, zona horaria, umbrales y credenciales de Supabase
+datos/semilla.js      puntos, caminos, observadores y archivos de ejemplo
+supabase/esquema.sql  tablas, políticas y funciones de la fase 2
 supabase/LEEME.md     cómo conectar la base de datos, paso a paso
 ```
+
+Las páginas antiguas (`zona.html`, `camino.html`, `archivo.html`, etc.) redirigen a la pestaña
+correspondiente de `index.html`, también cuando el sitio se abre como archivo local.
 
 ## Las pestañas
 
@@ -30,23 +33,26 @@ supabase/LEEME.md     cómo conectar la base de datos, paso a paso
 | Ahora | todos | lluvia de los seis puntos y estado del camino |
 | Camino | todos | estado de los tramos, informar un cambio, historial |
 | Registrar | con tarjeta | lectura del tubo en tres pasos |
-| Archivo | todos | archivos publicados, tablero y tabla |
+| Archivo | todos | archivos publicados, tablero y tabla con filtros |
 | Directiva | directiva | por validar, ingreso oficial, observadores, datos, subir |
 | Ayuda | todos | estados, milímetros, alertas, sin internet |
 
-Dentro de **Directiva**:
+Contacto, kiosco y ayuda también están en el pie. La barra superior permite agrandar la letra
+con **A+**; el modo Kiosco se abre desde el pie y se cierra con cinco toques en la marca o con
+`Escape`.
 
-- **Por validar**: lecturas y avisos que esperan revisión, de a uno.
-- **Oficial**: ingreso de planillas, equipos automáticos o verificaciones en terreno. Entra
-  ya validado; si es de la última hora y media, también mueve el tablero.
-- **Observadores**: padrón con alias y estado, sin datos personales.
-- **Datos**: puntos de medición (crear, editar, quitar si no tienen lecturas) y respaldo
-  completo en JSON.
-- **Subir**: archivos CSV o XLSX en cuatro pasos, con columnas, errores y duplicados.
+## Roles y tarjetas
 
-## Tarjetas de prueba
+- **Público:** ve lluvia, caminos, archivos y ayuda; puede avisar algo sin registrarse.
+- **Observador:** entra con el código de su tarjeta (8 dígitos) y una clave de 4 números.
+  Registra lecturas y ve su historial reciente.
+- **Directiva:** además valida lecturas, registra datos oficiales, administra observadores,
+  crea o edita puntos y publica archivos históricos.
 
-Mientras el sitio está en modo local, las tarjetas viven en `datos/semilla.js`:
+La sesión dura 8 horas o 30 minutos sin uso. Tres intentos fallidos bloquean la hoja por
+5 minutos.
+
+### Tarjetas de prueba
 
 | Tarjeta | Clave | Rol |
 |---|---|---|
@@ -54,9 +60,40 @@ Mientras el sitio está en modo local, las tarjetas viven en `datos/semilla.js`:
 | 10042051 | 2222 | Observadora El Manzano |
 | 90000001 | 9999 | Directiva |
 
-**Cambiar estas claves antes de publicar el sitio con datos reales.** En modo local la
+**Cambiar estas claves antes de usar datos reales.** Mientras el sitio esté en modo local, la
 validación ocurre en el navegador; sirve para demostrar el flujo, no para proteger datos.
-En la fase 2 la clave se valida en el servidor (ver `supabase/LEEME.md`).
+
+## Qué puede hacer el sitio
+
+- **Semáforo con cuatro estados** (Normal, Ojo, Peligro, Sin dato) y cifras que siempre dicen
+  hace cuánto se midieron.
+- **Registro de lecturas** con teclado numérico, límite de 0 a 300 mm y un decimal, lectura
+  atrasada de hasta 7 días y foto comprimida en el mismo navegador.
+- **Validación de a una lectura**: validar, corregir (crea una fila nueva y conserva la
+  original) o rechazar con motivo. El semáforo público solo se mueve con datos validados.
+- **Ingreso oficial** de planillas, equipos automáticos o verificaciones en terreno. Si la
+  medición es reciente, actualiza el tablero; si es más antigua, queda en el historial y la
+  pantalla lo dice.
+- **Puntos de medición**: crear, editar y quitar; un punto nuevo crea también su tramo de
+  camino. Las acciones destructivas usan una hoja de confirmación, nunca `window.confirm`.
+- **Observadores**: alta con tarjeta y clave aleatorias, y reposición de clave o de tarjeta
+  desde la ficha, mostrando el resultado en la misma hoja.
+- **Carga de históricos** en cuatro pasos:
+  - CSV con reglas RFC 4180 (comillas y comas internas).
+  - XLSX nativo, sin librerías, usando `DecompressionStream`; si el navegador no lo soporta,
+    la pantalla lo dice y sugiere guardar como CSV. Nunca inventa filas.
+  - Fechas `AAAA-MM-DD`, `DD/MM/AAAA` y `DD-MM-AAAA`, con hora opcional.
+  - Borradores que se guardan, retoman y descartan.
+  - Reglas de conflicto para fechas repetidas: saltar, mezclar o reemplazar.
+  - Resumen real: acumulado, día más lluvioso, días con lluvia, por punto y por hora.
+  - Publicación con 24 horas para deshacerla.
+- **Archivo**: tablero, tabla filtrable por punto y texto, mapeo de columnas cuando el archivo
+  no trae los nombres del proyecto, y descarga en CSV con BOM.
+- **Kiosco**: estaciones ordenadas por gravedad, tres por página, cambio cada 15 segundos,
+  flechas del teclado, reloj con la fecha de Chile e indicador de página.
+- **Accesibilidad y layout**: alto fijo, sin scroll en Ahora › Lluvia a 1280×800; textos desde
+  16 px; controles desde 56 px; foco atrapado en las hojas laterales; flechas entre pestañas y
+  solapas; enlace para saltar al contenido.
 
 ## Los datos
 
@@ -67,43 +104,53 @@ Todo lo que se registra, valida o carga queda en ese navegador.
   observadores y archivos.
 - **Restaurar:** Directiva → Datos → Cargar. Reemplaza el estado completo.
 - **Volver al ejemplo:** Directiva → Datos → Restaurar ejemplo.
-- **Borrar todo:** limpiar los datos del sitio en el navegador (o la clave
-  `maipo_vigia_estado_v2` en el almacenamiento local).
+- **Versión del formato:** `datos/config.js` sella cada guardado. Si cambia la versión, el sitio
+  descarta el estado viejo y vuelve a la semilla.
 
-Cuando `datos/config.js` tenga `url` y `anonKey` de Supabase, el mismo sitio lee y publica en la
-base de datos. No hay que cambiar pantallas: solo ese archivo.
+Antes de publicar en Supabase, el sitio elimina de la copia la sesión y las credenciales de las
+tarjetas (`card` y `pin`); solo conserva los dos últimos dígitos de la tarjeta. El servidor hace
+el mismo saneamiento otra vez antes de guardar el snapshot.
+
+## Configuración
+
+`datos/config.js` reúne lo que se ajusta sin tocar la aplicación:
+
+- `version`: versión del formato del estado.
+- `zonaHoraria`: `America/Santiago`; todas las fechas y horas se calculan con ella.
+- `umbrales`: 5 y 15 mm por hora, 30 minutos de frescura y 90 minutos de ventana del tablero,
+  además del estado `provisional` y su versión.
+- `supabase`: URL y clave pública `anon`.
+- `auth.modo`: `local` o `supabase`.
+
+## Conectar Supabase
+
+Cuando `datos/config.js` tenga URL y `anonKey`, el mismo sitio lee y publica en la base de
+datos. Las funciones esperadas están en `supabase/esquema.sql` y el paso a paso en
+`supabase/LEEME.md`. En resumen:
+
+- el público lee el último tablero publicado;
+- la tarjeta se valida contra `mv_entrar`;
+- la clave del servidor viaja en `Authorization: Bearer <anonKey>` y el token de sesión en el
+  cuerpo como `p_token`;
+- solo la directiva puede publicar (`mv_guardar_estado`) y administrar tarjetas;
+- `mm` acepta nulo para representar «Sin dato».
+
+## Verificación
+
+Desde la raíz del repositorio:
+
+```bash
+node tests/verificar.mjs
+```
+
+La suite usa Node estándar y Obscura por CDP (`ws://127.0.0.1:9222`), levanta un servidor
+efímero sobre `docs/` y comprueba unidades del almacén, layout a 1280×800 y 390×844, barrido de
+vistas, flujos de sesión, validación, puntos, históricos y kiosco, además de excepciones JS y
+diálogos nativos.
 
 ## Datos de ejemplo
 
 Las cifras —18,4 mm en San Alfonso, camino restringido por Carabineros— son de demostración.
 La franja del pie dice «Datos de ejemplo» mientras el sitio esté en modo local. Los umbrales
-(5 y 15 mm en la última hora) son provisionales y se acuerdan con SERNAGEOMIN.
-
-El semáforo es apoyo comunitario: **no avisa de aluviones ni reemplaza a SENAPRED, Carabineros
-ni Bomberos**.
-
-## Reglas de la interfaz
-
-- El alto de la página es el de la ventana. Lo único que se desplaza es el panel de contenido.
-- Si algo no cabe, se parte en otra solapa; nunca se estira la página.
-- Cuatro estados con forma, palabra y color: Normal, Ojo, Peligro, Sin dato. Un punto sin
-  lectura va en gris con «—», nunca en verde ni con cero.
-- Cada cifra dice hace cuánto se midió, y cada estado de camino dice quién lo informó.
-- Nada de letra bajo 16 px ni controles bajo 56 px.
-- Sin CDN, sin Google Fonts, sin iconos de fuente, sin mapas externos.
-
-## Publicar
-
-La carpeta `docs/` es la que se publica. El archivo `.nojekyll` ya está para que GitHub Pages
-no procese el sitio con Jekyll.
-
-Para actualizar: reemplazar los archivos, confirmar el cambio (`git commit`) y subirlo
-(`git push`). GitHub Pages tarda alrededor de un minuto.
-
-## Pendientes conocidos
-
-- Las fotos de las lecturas son una marca, no un archivo: falta Storage.
-- La validación de tarjeta es local hasta conectar Supabase.
-- No hay recuperación de clave ni expulsión de una tarjeta perdida desde el sitio; se hace
-  editando la semilla o, en fase 2, con una función del servidor.
-- El kiosco está pensado para 1920×1080; en pantallas menores las tarjetas se achican.
+son provisionales y se acuerdan con Sernageomin. El semáforo es apoyo comunitario: **no avisa
+de aluviones ni reemplaza a SENAPRED, Carabineros ni Bomberos**.

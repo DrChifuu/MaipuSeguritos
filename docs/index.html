@@ -14,6 +14,7 @@
   <script src="assets/maipo.js" defer></script>
 </head>
 <body>
+  <a href="#mainPanel" class="skip-link">Saltar al contenido principal</a>
   <div class="app-shell" id="appShell">
     <!-- BARRA SUPERIOR -->
     <header class="topbar" role="banner">
@@ -33,6 +34,10 @@
         <div class="desktop-session-wrap" id="desktopSessionWrap"></div>
       </div>
     </header>
+
+    <div class="offline-banner hidden" id="offlineBanner" role="status">
+      Sin conexión: se muestran los datos guardados en este equipo.
+    </div>
 
     <!-- NIVEL 1: BARRA DE PESTAÑAS (ESCRITORIO) -->
     <nav class="tabbar" id="desktopTabbar" role="tablist" aria-label="Secciones principales"></nav>
@@ -81,6 +86,7 @@
     <div class="kiosco-grid" id="kioscoGrid"></div>
     <div class="kiosco-foot">
       <span id="kioscoClock"></span>
+      <span id="kioscoFootMode"></span>
       <span>Datos de ejemplo · El semáforo es apoyo comunitario, no alerta oficial</span>
     </div>
   </section>

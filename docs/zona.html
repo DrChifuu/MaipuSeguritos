@@ -3,12 +3,25 @@
 <head>
 <meta charset="utf-8">
 <title>Maipo Vigía — esta página se mudó</title>
-<meta http-equiv="refresh" content="0; url=./#/ahora/lluvia">
-<link rel="canonical" href="./#/ahora/lluvia">
+<link rel="canonical" href="./index.html#/ahora/lluvia">
 </head>
 <body style="font-family:system-ui,sans-serif;font-size:18px;padding:24px;">
-<p>Esta página ahora es una pestaña del tablero.</p>
-<p><a href="./#/ahora/lluvia">Continuar a Maipo Vigía</a></p>
-<script>location.replace('./#/ahora/lluvia');</script>
+<p>Esta página ahora es una zona del tablero.</p>
+<p><a href="./index.html#/ahora/lluvia">Continuar a Maipo Vigía</a></p>
+<script>
+(function () {
+  var slug = '';
+  try {
+    var params = new URLSearchParams(location.search);
+    slug = params.get('id') || '';
+  } catch (e) {}
+  if (!slug && location.hash) slug = location.hash.replace(/^#\/?/, '');
+  slug = String(slug || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  var destino = slug
+    ? './index.html#/ahora/zona/' + encodeURIComponent(slug) + '/lluvia24'
+    : './index.html#/ahora/lluvia';
+  location.replace(destino);
+})();
+</script>
 </body>
 </html>

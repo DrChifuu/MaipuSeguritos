@@ -6,25 +6,106 @@
 
       const CONFIG = window.MV_CONFIG || {};
       const ALMACEN = window.MV_ALMACEN || null;
-      const STORAGE_KEY = CONFIG.clave || 'maipo_vigia_state_v2';
+      const STORAGE_KEY = CONFIG.clave || 'maipo_vigia_estado_v2';
       const FONT_KEY = 'maipo_vigia_font_large';
+      const ZONA = CONFIG.zonaHoraria || 'America/Santiago';
 
       /* ------------------------------------------------------------------------
-         1. UMBRALES PARAMETRIZADOS (LISTOS PARA CALIBRAR CON SERNAGEOMIN)
+         1. UMBRALES PARAMETRIZADOS (SE CALIBRAN CON SERNAGEOMIN EN config.js)
          ------------------------------------------------------------------------ */
-      const THRESHOLDS = {
+      const UMBRALES_POR_DEFECTO = {
         amber1h: 5.0,
         red1h: 15.0,
         amber3h: 15.0,
         red3h: 30.0,
         staleMinutes: 30,
+        ventanaTableroMin: 90,
         status: 'provisional',
         validatedBy: null,
         version: '0.1-provisional'
       };
 
-      /* Referencia temporal base para los datos de ejemplo: hoy 09:42 */
-      const BASE_NOW_ISO = '2026-11-23T09:42:00-03:00';
+      const THRESHOLDS = Object.assign({}, UMBRALES_POR_DEFECTO, CONFIG.umbrales || {});
+
+      /* ------------------------------------------------------------------------
+         1 bis. TIEMPO EN LA ZONA DEL VALLE
+         Nada de fechas fijas: todo se calcula con America/Santiago.
+         ------------------------------------------------------------------------ */
+      function partesFechaChile(fecha) {
+        const d = (fecha instanceof Date) ? fecha : new Date(fecha === undefined ? Date.now() : fecha);
+        const dos = n => String(n).padStart(2, '0');
+        try {
+          const partes = new Intl.DateTimeFormat('es-CL', {
+            timeZone: ZONA,
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false
+          }).formatToParts(d);
+          const o = {};
+          partes.forEach(function (x) { if (x.type !== 'literal') o[x.type] = x.value; });
+          return {
+            anio: o.year,
+            mes: o.month,
+            dia: o.day,
+            hora: o.hour === '24' ? '00' : o.hour,
+            minuto: o.minute
+          };
+        } catch (e) {
+          return {
+            anio: String(d.getFullYear()),
+            mes: dos(d.getMonth() + 1),
+            dia: dos(d.getDate()),
+            hora: dos(d.getHours()),
+            minuto: dos(d.getMinutes())
+          };
+        }
+      }
+
+      function hoyLocalISO() {
+        const p = partesFechaChile();
+        return p.anio + '-' + p.mes + '-' + p.dia;
+      }
+
+      function horaLocalHHMM() {
+        const p = partesFechaChile();
+        return p.hora + ':' + p.minuto;
+      }
+
+      function haceNDiasISO(dias) {
+        const d = new Date(Date.now() - (Number(dias) || 0) * 86400000);
+        const p = partesFechaChile(d);
+        return p.anio + '-' + p.mes + '-' + p.dia;
+      }
+
+      function fechaLargaChile(fecha) {
+        const d = fecha ? new Date(fecha) : new Date();
+        try {
+          const texto = new Intl.DateTimeFormat('es-CL', {
+            timeZone: ZONA, weekday: 'long', day: 'numeric', month: 'long'
+          }).format(d);
+          return texto.charAt(0).toUpperCase() + texto.slice(1);
+        } catch (e) {
+          const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+          const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+          return dias[d.getDay()] + ' ' + d.getDate() + ' de ' + meses[d.getMonth()];
+        }
+      }
+
+      /* Devuelve el desfase de Chile para una hora de pared dada, probando
+         los dos valores posibles (-03:00 y -04:00). Sirve también en los
+         cambios de horario, sin depender de librerías. */
+      function offsetChile(fechaLocal) {
+        const partes = String(fechaLocal).split('T');
+        const fecha = partes[0];
+        const hora = (partes[1] || '00:00').slice(0, 5);
+        const p = partesFechaChile(new Date(fecha + 'T' + hora + ':00-03:00'));
+        if (p.anio + '-' + p.mes + '-' + p.dia === fecha && p.hora + ':' + p.minuto === hora) return '-03:00';
+        return '-04:00';
+      }
+
+      function isoConOffsetChile(fecha, hora) {
+        const hhmm = (hora || '00:00').slice(0, 5);
+        return fecha + 'T' + hhmm + ':00' + offsetChile(fecha + 'T' + hhmm);
+      }
 
       /* ------------------------------------------------------------------------
          2. ICONOS SVG INLINE (24×24, TRAZO 2px, COLOR HEREDADO)
@@ -77,8 +158,9 @@
       }
 
       function computeRainState(rainfallMm, minutesAgo, hasSensor) {
-        if (hasSensor === false || rainfallMm === null || rainfallMm === undefined) return 'sindato';
+        if (rainfallMm === null || rainfallMm === undefined) return 'sindato';
         if (typeof minutesAgo === 'number' && minutesAgo > THRESHOLDS.staleMinutes) return 'sindato';
+        if (minutesAgo === null && hasSensor === false) return 'sindato';
         if (rainfallMm >= THRESHOLDS.red1h) return 'rojo';
         if (rainfallMm >= THRESHOLDS.amber1h) return 'ambar';
         return 'verde';
@@ -112,6 +194,89 @@
       }
 
       /* ------------------------------------------------------------------------
+         3 bis. FOTOS, VALORES Y TEXTO DE APOYO
+         ------------------------------------------------------------------------ */
+      function fotoHtml(foto, alt) {
+        if (!foto) return '';
+        if (typeof foto === 'string') {
+          return `<p class="muted mt-8">Foto adjunta: ${escapeHtml(foto)}</p>`;
+        }
+        if (foto.dataUrl) {
+          return `<img class="photo-preview" src="${foto.dataUrl}" alt="${escapeHtml(alt || 'Foto adjunta')}" />`;
+        }
+        return '';
+      }
+
+      /* Comprime en el navegador: 480 px de lado mayor, JPEG 0.65 y tope de
+         60 KB. Si no se puede, devuelve null y la pantalla avisa. */
+      function comprimirImagenFile(file, callback) {
+        if (!file || !/^image\//.test(file.type || '')) { callback(null); return; }
+        const lector = new FileReader();
+        lector.onerror = function () { callback(null); };
+        lector.onload = function () {
+          const img = new Image();
+          img.onerror = function () { callback(null); };
+          img.onload = function () {
+            const maxLado = 480;
+            const escala = Math.min(1, maxLado / Math.max(img.width, img.height));
+            const ancho = Math.max(1, Math.round(img.width * escala));
+            const alto = Math.max(1, Math.round(img.height * escala));
+            const lienzo = document.createElement('canvas');
+            lienzo.width = ancho;
+            lienzo.height = alto;
+            const ctx = lienzo.getContext('2d');
+            if (!ctx) { callback(null); return; }
+            ctx.drawImage(img, 0, 0, ancho, alto);
+
+            function pesoDe(dataUrl) {
+              return Math.round((dataUrl.length - 'data:image/jpeg;base64,'.length) * 3 / 4);
+            }
+
+            let dataUrl = lienzo.toDataURL('image/jpeg', 0.65);
+            let peso = pesoDe(dataUrl);
+            const esJpeg = dataUrl.indexOf('data:image/jpeg') === 0;
+            /* Tope normal: 60 KB. Si el navegador no sabe codificar JPEG y
+               devuelve PNG, se acepta un tope mayor y se achica la imagen. */
+            const tope = esJpeg ? 60 * 1024 : 300 * 1024;
+
+            if (peso > tope) {
+              [0.55, 0.45].forEach(function (q) {
+                if (peso <= tope) return;
+                dataUrl = lienzo.toDataURL('image/jpeg', q);
+                peso = pesoDe(dataUrl);
+              });
+            }
+
+            let lado = Math.max(ancho, alto);
+            while (peso > tope && lado > 160) {
+              lado = Math.round(lado * 0.75);
+              const factor = lado / Math.max(ancho, alto);
+              const chico = document.createElement('canvas');
+              chico.width = Math.max(1, Math.round(ancho * factor));
+              chico.height = Math.max(1, Math.round(alto * factor));
+              const c2 = chico.getContext('2d');
+              if (!c2) break;
+              c2.drawImage(lienzo, 0, 0, chico.width, chico.height);
+              dataUrl = chico.toDataURL('image/jpeg', 0.6);
+              peso = pesoDe(dataUrl);
+            }
+
+            if (peso > tope) { callback(null); return; }
+            callback({ nombre: file.name, dataUrl: dataUrl, peso: peso });
+          };
+          img.src = String(lector.result);
+        };
+        lector.readAsDataURL(file);
+      }
+
+      function mmTextoValido(texto) {
+        if (texto === '') return true;
+        if (!/^\d{0,3}(,\d?)?$/.test(texto)) return false;
+        const n = Number(texto.replace(',', '.'));
+        return Number.isFinite(n) && n >= 0 && n <= 300;
+      }
+
+      /* ------------------------------------------------------------------------
          4. DATOS DE EJEMPLO (COHERENTES ENTRE LLUVIA, CAMINO, ARCHIVO Y DIRECTIVA)
          ------------------------------------------------------------------------ */
       /* La semilla de ejemplo vive en datos/semilla.js, para poder editarla
@@ -125,16 +290,14 @@
          5. ESTADO GLOBAL + PERSISTENCIA EN localStorage
          ------------------------------------------------------------------------ */
       let state = loadState();
+      if (!Array.isArray(state.uploadDrafts)) state.uploadDrafts = [];
 
       function loadState() {
         const guardado = ALMACEN ? ALMACEN.cargar() : null;
         if (guardado) return guardado;
         const inicial = buildInitialState();
-        /* La semilla es de ejemplo y se rotula como recién actualizada al abrir,
-           para que el tablero no muestre una hora vieja. */
-        if (typeof horaLocalHHMM === 'function') {
-          inicial.updatedLabel = 'hoy a las ' + horaLocalHHMM();
-        }
+        /* La etiqueta de actualización no se inventa al cargar: se mueve cuando
+           hay una acción real (validar, ingresar, confirmar un tramo). */
         try { if (ALMACEN) ALMACEN.guardar(inicial); } catch (e) { /* sin cuota */ }
         return inicial;
       }
@@ -171,9 +334,10 @@
         regValueStr: '',
         regSinDato: false,
         regIsBackdated: false,
-        regDate: '2026-11-23',
-        regTime: '09:30',
+        regDate: hoyLocalISO(),
+        regTime: horaLocalHHMM(),
         regPhoto: '',
+        regPhotoNombre: '',
         regSubmittedFolio: null,
         /* Estado de Directiva › Por validar */
         valFilter: 'todos',
@@ -198,9 +362,25 @@
         avisarNota: '',
         avisarPhoto: '',
         avisarDone: false,
+        /* Archivo › Tabla */
+        tablaPunto: '',
+        tablaTexto: '',
+        /* Hoja de mapeo de columnas de un archivo */
+        mapFileId: null,
+        mapCols: null,
+        /* Ruta pendiente después de entrar */
+        pendingRoute: null,
+        /* Resultado de crear o reponer una tarjeta */
+        obsAddResult: null,
+        obsResetResult: null,
+        /* Confirmación reutilizable */
+        confirmTitulo: '',
+        confirmTexto: '',
+        confirmAccion: null,
         /* Kiosco */
         kioscoActive: false,
         kioscoFocusIdx: 0,
+        kioscoPage: 0,
         kioscoTapCount: 0,
         kioscoTimer: null
       };
@@ -309,9 +489,24 @@
         const allowed = getTabsForRole(role).map(t => t.id);
 
         if (!allowed.includes(tab)) {
+          /* Se guarda el destino y se pide la tarjeta; al entrar se vuelve. */
+          if (tab === 'registrar' || tab === 'directiva') {
+            ui.pendingRoute = { tab: tab, subtab: subtab, zoneId: zoneId || null };
+            showToast('Entra con tu tarjeta para usar esta sección.');
+            openSheet('ingreso');
+          }
           tab = 'ahora';
           subtab = 'lluvia';
           zoneId = null;
+        }
+
+        /* No se puede revisar lo que no se escribió. */
+        if (tab === 'registrar' && (subtab === 'revisar' || subtab === 'lectura')) {
+          const sinValor = !ui.regSinDato && (ui.regValueStr === '' || !mmTextoValido(ui.regValueStr));
+          if (subtab === 'revisar' && !ui.regSubmittedFolio && sinValor) {
+            subtab = 'lectura';
+            showToast('Primero escribe cuánto marcó el tubo.');
+          }
         }
 
         ui.tab = tab;
@@ -384,7 +579,22 @@
         }, 4200);
       }
 
+      function openConfirm(titulo, texto, accion) {
+        ui.confirmTitulo = titulo || '¿Continuar?';
+        ui.confirmTexto = texto || '';
+        ui.confirmAccion = typeof accion === 'function' ? accion : null;
+        openSheet('confirm');
+      }
+
+      function elementosEnfocables(raiz) {
+        if (!raiz) return [];
+        return Array.from(raiz.querySelectorAll(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )).filter(el => el.offsetParent !== null || el.getClientRects().length > 0);
+      }
+
       function openSheet(type, data) {
+        if (!ui.sheetType) ui.lastFocusEl = document.activeElement;
         ui.sheetType = type;
         ui.sheetData = data || null;
         if (type === 'ingreso') {
@@ -397,19 +607,37 @@
           ui.avisarDone = false;
           ui.avisarNota = '';
           ui.avisarPhoto = '';
+          if (data && data.pointName) {
+            ui.avisarPoint = data.pointName;
+          } else if (!state.roads.some(r => r.name === ui.avisarPoint)) {
+            ui.avisarPoint = state.roads[0] ? state.roads[0].name : 'San Alfonso';
+          }
         }
         if (type === 'subir') {
           resetUploadWizard();
         }
         renderSheet();
         document.getElementById('sheetBackdrop').classList.remove('hidden');
+        const shell = document.getElementById('appShell');
+        if (shell) shell.setAttribute('aria-hidden', 'true');
         document.getElementById('btnCloseSheet').focus();
       }
 
       function closeSheet() {
+        const estabaAbierta = !document.getElementById('sheetBackdrop').classList.contains('hidden');
         ui.sheetType = null;
         ui.sheetData = null;
+        ui.obsAddResult = null;
+        ui.obsResetResult = null;
+        ui.confirmAccion = null;
         document.getElementById('sheetBackdrop').classList.add('hidden');
+        const shell = document.getElementById('appShell');
+        if (shell) shell.removeAttribute('aria-hidden');
+        const volver = ui.lastFocusEl;
+        ui.lastFocusEl = null;
+        if (estabaAbierta && volver && typeof volver.focus === 'function') {
+          try { volver.focus(); } catch (e) {}
+        }
       }
 
       /* ------------------------------------------------------------------------
@@ -526,10 +754,18 @@
 
         bottom.innerHTML = mobileItems.map((it, idx) => {
           const isSel = ui.tab === it.id;
+          const pendientes = (it.id === 'directiva' && pendingTotal > 0) ? pendingTotal : 0;
+          const badge = pendientes
+            ? `<span class="bottom-badge" aria-hidden="true">${pendientes > 9 ? '9+' : pendientes}</span>`
+            : '';
+          const etiqueta = pendientes
+            ? ` aria-label="${it.label}: ${pendientes} por revisar"`
+            : '';
           return `
-            <button type="button" class="bottom-btn" aria-selected="${isSel}" data-mobile-idx="${idx}">
+            <button type="button" class="bottom-btn" aria-selected="${isSel}" data-mobile-idx="${idx}"${etiqueta}>
               ${it.icon}
               <span>${it.label}</span>
+              ${badge}
             </button>
           `;
         }).join('');
@@ -650,7 +886,7 @@
           const maxBar = Math.max(20, ...s.hourly24h.map(v => v || 0));
           const svgW = 680;
           const svgH = 210;
-          const padL = 44;
+          const padL = 56;
           const padB = 28;
           const padT = 16;
           const plotW = svgW - padL - 16;
@@ -675,7 +911,7 @@
           const xLabels = [0, 6, 12, 18, 23].map(idx => {
             const x = padL + idx * (plotW / 24) + barW / 2;
             const txt = idx === 23 ? 'Ahora' : `-${23 - idx} h`;
-            return `<text x="${x}" y="${svgH - 6}" font-size="14" fill="#33424B" text-anchor="middle">${txt}</text>`;
+            return `<text x="${x}" y="${svgH - 6}" font-size="16" fill="#33424B" text-anchor="middle">${txt}</text>`;
           }).join('');
 
           body = `
@@ -693,9 +929,9 @@
                 <svg class="chart-svg" viewBox="0 0 ${svgW} ${svgH}" role="img" aria-label="Gráfico de lluvia últimas 24 horas en ${escapeHtml(s.name)}">
                   <line x1="${padL}" y1="${padT + plotH}" x2="${svgW - 16}" y2="${padT + plotH}" stroke="#33424B" stroke-width="2"/>
                   <line x1="${padL}" y1="${y5}" x2="${svgW - 16}" y2="${y5}" stroke="#6D4004" stroke-width="2" stroke-dasharray="6,4"/>
-                  <text x="4" y="${y5 + 5}" font-size="14" font-weight="700" fill="#6D4004">5 mm</text>
+                  <text x="4" y="${y5 + 5}" font-size="16" font-weight="700" fill="#6D4004">5 mm</text>
                   <line x1="${padL}" y1="${y15}" x2="${svgW - 16}" y2="${y15}" stroke="#8C1D18" stroke-width="2" stroke-dasharray="6,4"/>
-                  <text x="0" y="${y15 + 5}" font-size="14" font-weight="700" fill="#8C1D18">15 mm</text>
+                  <text x="0" y="${y15 + 5}" font-size="16" font-weight="700" fill="#8C1D18">15 mm</text>
                   ${barsSvg}
                   ${xLabels}
                 </svg>
@@ -937,6 +1173,7 @@
                 <div>
                   <label class="field-label" for="informPhotoInput">Foto opcional</label>
                   <input type="file" id="informPhotoInput" accept="image/*" style="min-height:56px; padding:12px 0;" />
+                  ${fotoHtml(ui.informPhoto, 'Foto del camino')}
                 </div>
               </div>
             </div>
@@ -977,7 +1214,11 @@
          11. VISTAS: PESTAÑA REGISTRAR (SOLO CON SESIÓN · 3 PASOS)
          ------------------------------------------------------------------------ */
       function getPreviousReadingForSector(sectorId) {
-        return state.readings.find(r => r.station_id === sectorId && r.estado_validacion === 'Validada' && r.rainfall_mm !== null);
+        return state.readings.find(r =>
+          r.station_id === sectorId &&
+          (r.estado_validacion === 'Validada' || r.estado_validacion === 'Corregida') &&
+          r.rainfall_mm !== null
+        );
       }
 
       function renderRegistrar() {
@@ -994,8 +1235,8 @@
         `;
 
         if (ui.subtab === 'identidad') {
-          const todayIso = '2026-11-23';
-          const minDateIso = '2026-11-16';
+          const todayIso = hoyLocalISO();
+          const minDateIso = haceNDiasISO(7);
           return `
             ${stepperHtml}
             <div class="card-box">
@@ -1114,7 +1355,8 @@
           `;
         }
 
-        const valLabel = ui.regSinDato ? 'Sin dato (—)' : `${formatMm(parseFloat(ui.regValueStr.replace(',', '.')))} mm`;
+        const mmNumerico = parseFloat(String(ui.regValueStr).replace(',', '.'));
+        const valLabel = ui.regSinDato ? 'Sin dato (—)' : (Number.isFinite(mmNumerico) ? `${formatMm(mmNumerico)} mm` : '—');
         const horaLabel = ui.regIsBackdated ? `${ui.regDate} a las ${ui.regTime} (atrasada)` : 'ahora (hora actual)';
 
         return `
@@ -1131,7 +1373,7 @@
             <div class="mb-12">
               <label class="field-label" for="regPhotoInput">Foto del tubo (opcional, una sola)</label>
               <input type="file" id="regPhotoInput" accept="image/*" style="min-height:56px; padding:12px 0;" />
-              ${ui.regPhoto ? `<div class="muted mt-8">Archivo adjunto: ${escapeHtml(ui.regPhoto)}</div>` : ''}
+              ${fotoHtml(ui.regPhoto, 'Foto del tubo')}
             </div>
 
             <div class="flex-between mt-16">
@@ -1165,7 +1407,7 @@
                 <div class="row-actions">
                   <button type="button" class="btn-primary" data-open-file-board="${f.id}">Ver como tablero</button>
                   <button type="button" data-download-file="${f.id}">${ICONS.download}<span>Descargar</span></button>
-                  ${role === 'directiva' && f.canUndo ? `<button type="button" class="btn-danger" data-undo-publish="${f.id}">Deshacer publicación</button>` : ''}
+                  ${role === 'directiva' && f.canUndo && f.publishedAt && (Date.now() - f.publishedAt < 24 * 60 * 60 * 1000) ? `<button type="button" class="btn-danger" data-undo-publish="${f.id}">Deshacer publicación</button>` : ''}
                 </div>
               </article>
             `).join('')}
@@ -1175,6 +1417,15 @@
       }
 
       function renderArchivoTablero() {
+        if (!Array.isArray(state.files) || state.files.length === 0) {
+          return `
+            <div class="card-box">
+              <h2 class="section-title mb-8">Todavía no hay archivos publicados</h2>
+              <p class="muted mb-12">Cuando la directiva suba un archivo histórico, el tablero aparece aquí.</p>
+              <button type="button" class="btn-primary" id="btnGoArchivosFromEmpty">Ir a Archivos</button>
+            </div>
+          `;
+        }
         const f = state.files.find(x => x.id === state.activeFileId) || state.files[0];
         const maxPt = Math.max(10, ...f.byPoint.map(p => p.mm));
         const maxHr = Math.max(5, ...f.byHour);
@@ -1245,9 +1496,9 @@
                 <svg class="chart-svg" viewBox="0 0 ${svgW} ${svgH}" role="img" aria-label="Distribución horaria de lluvia">
                   <line x1="12" y1="122" x2="${svgW - 12}" y2="122" stroke="#33424B" stroke-width="2"/>
                   ${hourSvg}
-                  <text x="16" y="142" font-size="14" fill="#33424B">00 h</text>
-                  <text x="${svgW / 2}" y="142" font-size="14" fill="#33424B" text-anchor="middle">12 h</text>
-                  <text x="${svgW - 16}" y="142" font-size="14" fill="#33424B" text-anchor="end">23 h</text>
+                  <text x="16" y="142" font-size="16" fill="#33424B">00 h</text>
+                  <text x="${svgW / 2}" y="142" font-size="16" fill="#33424B" text-anchor="middle">12 h</text>
+                  <text x="${svgW - 16}" y="142" font-size="16" fill="#33424B" text-anchor="end">23 h</text>
                 </svg>
               </div>
             </div>
@@ -1256,20 +1507,55 @@
       }
 
       function renderArchivoTabla() {
+        if (!Array.isArray(state.files) || state.files.length === 0) {
+          return `
+            <div class="card-box">
+              <h2 class="section-title mb-8">Todavía no hay filas para mostrar</h2>
+              <p class="muted mb-12">Sube un archivo histórico o publica una lectura para empezar.</p>
+              <button type="button" class="btn-primary" id="btnGoArchivosFromEmpty">Ir a Archivos</button>
+            </div>
+          `;
+        }
         const f = state.files.find(x => x.id === state.activeFileId) || state.files[0];
+        const puntos = Array.from(new Set(f.rows.map(r => r.punto))).sort();
+        const texto = (ui.tablaTexto || '').trim().toLowerCase();
+        const filtradas = f.rows.filter(r => {
+          if (ui.tablaPunto && r.punto !== ui.tablaPunto) return false;
+          if (!texto) return true;
+          const fechaTxt = String(r.fecha).toLowerCase();
+          const iso = fechaTxt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          const dmy = iso ? iso[3] + '/' + iso[2] + '/' + iso[1] : '';
+          return fechaTxt.includes(texto) || dmy.includes(texto) || String(r.origen || '').toLowerCase().includes(texto);
+        });
         const perPage = 25;
-        const totalPages = Math.max(1, Math.ceil(f.rows.length / perPage));
+        const totalPages = Math.max(1, Math.ceil(filtradas.length / perPage));
         const page = Math.min(Math.max(1, state.tablePage), totalPages);
-        const slice = f.rows.slice((page - 1) * perPage, page * perPage);
+        const slice = filtradas.slice((page - 1) * perPage, page * perPage);
 
         return `
           <div class="flex-between mb-12">
             <div class="flex-row">
               <h2 class="section-title">${escapeHtml(f.name)}</h2>
-              <span class="muted">Mostrando ${slice.length} de ${f.rows.length} filas cargadas</span>
+              <span class="muted">Mostrando ${slice.length} de ${filtradas.length} filas${filtradas.length !== f.rows.length ? ' (de ' + f.rows.length + ')' : ''}</span>
             </div>
             <button type="button" id="btnTableToBoard">Ver como tablero</button>
           </div>
+
+          <div class="two-col mb-12">
+            <div>
+              <label class="field-label" for="tablaPunto">Filtrar por punto</label>
+              <select id="tablaPunto">
+                <option value="">Todos los puntos</option>
+                ${puntos.map(pt => `<option value="${escapeHtml(pt)}" ${ui.tablaPunto === pt ? 'selected' : ''}>${escapeHtml(pt)}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="tablaTexto">Buscar por fecha u origen</label>
+              <input type="search" id="tablaTexto" value="${escapeHtml(ui.tablaTexto || '')}" placeholder="Ej: 15/11 o planilla" />
+            </div>
+          </div>
+
+          ${filtradas.length === 0 ? `<div class="card-box"><p class="muted" style="margin:0;">No hay filas que coincidan con el filtro.</p></div>` : `
           <div class="table-wrap">
             <table class="data-table archive-table">
               <thead>
@@ -1294,7 +1580,7 @@
                 `).join('')}
               </tbody>
             </table>
-          </div>
+          </div>`}
           <div class="pagination-bar">
             <button type="button" id="btnPagePrev" ${page <= 1 ? 'disabled' : ''}>Anterior</button>
             <span>Página ${page} de ${totalPages}</span>
@@ -1373,7 +1659,8 @@
                 <div class="info-banner" style="margin:0;">
                   <div><strong>Observador:</strong> ${escapeHtml(r.observador_alias)}</div>
                   <div><strong>Instrumento:</strong> ${escapeHtml(r.instrumento)}</div>
-                  <div><strong>Foto:</strong> ${r.foto ? escapeHtml(r.foto) : 'Sin foto adjunta'}</div>
+                  <div><strong>Foto:</strong> ${r.foto ? '' : 'Sin foto adjunta'}</div>
+                  ${fotoHtml(r.foto, 'Foto de la lectura')}
                 </div>
                 <div class="info-banner" style="margin:0;">
                   <div><strong>Para comparar (lectura anterior):</strong></div>
@@ -1440,6 +1727,8 @@
                 <div class="muted mt-8">${escapeHtml(roadNow ? `${roadNow.source} · ${roadNow.timeLabel}` : '')}</div>
               </div>
             </div>
+
+            ${fotoHtml(a.foto, 'Foto del aviso de camino')}
 
             <div class="flex-row mt-12">
               <button type="button" class="btn-ok" id="btnValApproveRoad">Validar y actualizar camino</button>
@@ -1514,22 +1803,10 @@
          Planillas, equipos automáticos o verificaciones en terreno. Entra ya
          validado y no pasa por la cola de revisión ciudadana.
          ------------------------------------------------------------------------ */
-      function hoyLocalISO() {
-        const d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-      }
-
-      function horaLocalHHMM() {
-        const d = new Date();
-        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-      }
-
       function etiquetaHora(fecha, hora) {
         const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-        const ayer = new Date(Date.now() - 86400000);
-        const ayerISO = ayer.getFullYear() + '-' + String(ayer.getMonth() + 1).padStart(2, '0') + '-' + String(ayer.getDate()).padStart(2, '0');
         if (fecha === hoyLocalISO()) return 'hoy a las ' + hora;
-        if (fecha === ayerISO) return 'ayer a las ' + hora;
+        if (fecha === haceNDiasISO(1)) return 'ayer a las ' + hora;
         const partes = String(fecha).split('-');
         const dia = Number(partes[2]);
         const mes = meses[Number(partes[1]) - 1] || '';
@@ -1620,6 +1897,12 @@
       function renderDirectivaDatos() {
         const conectado = !!(ALMACEN && ALMACEN.configurado);
         const modoTxt = conectado ? 'Supabase' : 'Local';
+        const est = (ALMACEN && typeof ALMACEN.estado === 'function') ? ALMACEN.estado() : null;
+        const sincronizando = !!(est && est.sincronizando);
+        const ultimo = est && est.ultimoEnvioOk ? new Date(est.ultimoEnvioOk) : null;
+        const ultimoTxt = ultimo
+          ? 'Último envío ' + formatRelativeTime(Math.max(0, Math.round((Date.now() - ultimo.getTime()) / 60000)))
+          : 'Todavía no se publicó desde este equipo.';
 
         return `
           <h2 class="section-title mb-12">Datos del sitio</h2>
@@ -1640,6 +1923,20 @@
             <input type="file" id="fileRespaldo" accept="application/json,.json" class="sr-only" />
             <p class="muted mt-8" style="margin-bottom:0;">El respaldo incluye puntos, caminos, lecturas, observadores y archivos. Guárdalo antes de cambiar de computador.</p>
           </div>
+
+          ${conectado ? `
+            <div class="card-box mb-12">
+              <div class="flex-between">
+                <div>
+                  <strong>Sincronización con el servidor</strong>
+                  <div class="muted">${escapeHtml(ultimoTxt)}</div>
+                </div>
+                <button type="button" class="btn-sm-pad" id="btnSyncNow" ${sincronizando ? 'disabled' : ''}>
+                  ${sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}
+                </button>
+              </div>
+            </div>
+          ` : ''}
 
           <div class="flex-between mb-8">
             <h3 class="section-title" style="margin:0;">Puntos de medición</h3>
@@ -1691,21 +1988,72 @@
         ui.uploadErrorMsg = '';
       }
 
-      function parseDelimitedText(text, filename) {
-        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-        if (lines.length < 2) {
-          ui.uploadErrorMsg = 'El archivo tiene muy pocas líneas para leer columnas.';
+      /* Lector CSV RFC 4180: respeta comillas y separadores dentro de ellas. */
+      function parseCsvLine(linea, sep) {
+        const salida = [];
+        let campo = '';
+        let comillas = false;
+        for (let i = 0; i < linea.length; i++) {
+          const c = linea[i];
+          if (comillas) {
+            if (c === '"') {
+              if (linea[i + 1] === '"') { campo += '"'; i++; }
+              else comillas = false;
+            } else {
+              campo += c;
+            }
+          } else if (c === '"') {
+            comillas = true;
+          } else if (c === sep) {
+            salida.push(campo);
+            campo = '';
+          } else {
+            campo += c;
+          }
+        }
+        salida.push(campo);
+        return salida.map(v => v.trim());
+      }
+
+      /* Acepta YYYY-MM-DD, DD/MM/YYYY y DD-MM-YYYY, con hora opcional.
+         Devuelve «YYYY-MM-DD HH:MM» o cadena vacía si no se entiende. */
+      function normalizarFecha(texto) {
+        const t = String(texto || '').trim().replace(/\s+/g, ' ');
+        if (!t) return '';
+
+        let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+        if (m) {
+          const mes = String(m[2]).padStart(2, '0');
+          const dia = String(m[3]).padStart(2, '0');
+          if (Number(mes) < 1 || Number(mes) > 12 || Number(dia) < 1 || Number(dia) > 31) return '';
+          return m[1] + '-' + mes + '-' + dia + ' ' + String(m[4] || '00').padStart(2, '0') + ':' + String(m[5] || '00').padStart(2, '0');
+        }
+
+        m = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:[ T](\d{1,2}):(\d{2}))?/);
+        if (m) {
+          const dia = String(m[1]).padStart(2, '0');
+          const mes = String(m[2]).padStart(2, '0');
+          if (Number(dia) < 1 || Number(dia) > 31 || Number(mes) < 1 || Number(mes) > 12) return '';
+          return m[3] + '-' + mes + '-' + dia + ' ' + String(m[4] || '00').padStart(2, '0') + ':' + String(m[5] || '00').padStart(2, '0');
+        }
+        return '';
+      }
+
+      function aplicarTabla(headers, rows, nombre, formato) {
+        const limpios = rows
+          .map(r => (r || []).map(c => String(c === null || c === undefined ? '' : c).trim()))
+          .filter(r => r.some(c => c !== ''));
+        if (!headers || headers.length === 0 || limpios.length === 0) {
+          ui.uploadErrorMsg = 'El archivo no trae filas con datos.';
           return false;
         }
-        const sep = lines[0].includes(';') ? ';' : (lines[0].includes('\t') ? '\t' : ',');
-        const rows = lines.map(l => l.split(sep).map(c => c.trim().replace(/^"|"$/g, '')));
-        ui.uploadHeaders = rows[0];
-        ui.uploadRawRows = rows.slice(1);
-        ui.uploadFileName = filename;
-        ui.uploadFormat = filename.split('.').pop().toUpperCase();
+
+        ui.uploadHeaders = headers.map((h, i) => String(h || '').trim() || ('Columna ' + (i + 1)));
+        ui.uploadRawRows = limpios;
+        ui.uploadFileName = nombre;
+        ui.uploadFormat = formato || (nombre.split('.').pop() || 'CSV').toUpperCase();
         ui.uploadErrorMsg = '';
 
-        /* Detección automática de columnas */
         const lower = ui.uploadHeaders.map(h => h.toLowerCase());
         const findIdx = (keys, fallback) => {
           const i = lower.findIndex(h => keys.some(k => h.includes(k)));
@@ -1721,50 +2069,293 @@
         return true;
       }
 
+      function parseDelimitedText(text, filename) {
+        const lineas = String(text).replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim() !== '');
+        if (lineas.length < 2) {
+          ui.uploadErrorMsg = 'El archivo tiene muy pocas líneas para leer columnas.';
+          return false;
+        }
+
+        const primera = lineas[0];
+        let sep = ',';
+        let mejor = 1;
+        [',', ';', '\t'].forEach(c => {
+          const n = parseCsvLine(primera, c).length;
+          if (n > mejor) { mejor = n; sep = c; }
+        });
+
+        const filas = lineas.map(l => parseCsvLine(l, sep));
+        return aplicarTabla(filas[0], filas.slice(1), filename, filename.split('.').pop().toUpperCase());
+      }
+
+      /* ------------------------------------------------------------------------
+         LECTOR XLSX SIN DEPENDENCIAS
+         ZIP (cabeceras locales) + DecompressionStream + DOMParser.
+         Si algo no calza, se dice; nunca se inventan filas.
+         ------------------------------------------------------------------------ */
+      function leerZip(buffer) {
+        const dv = new DataView(buffer);
+        const u8 = new Uint8Array(buffer);
+        let eocd = -1;
+        const minimo = Math.max(0, u8.length - 66000);
+        for (let i = u8.length - 22; i >= minimo; i--) {
+          if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+        }
+        if (eocd < 0) throw new Error('no parece un archivo ZIP válido');
+
+        const total = dv.getUint16(eocd + 10, true);
+        let off = dv.getUint32(eocd + 16, true);
+        const archivos = {};
+
+        for (let n = 0; n < total; n++) {
+          if (off + 46 > u8.length || dv.getUint32(off, true) !== 0x02014b50) break;
+          const metodo = dv.getUint16(off + 10, true);
+          const comprimido = dv.getUint32(off + 20, true);
+          const nombreLen = dv.getUint16(off + 28, true);
+          const extraLen = dv.getUint16(off + 30, true);
+          const comentarioLen = dv.getUint16(off + 32, true);
+          const localOff = dv.getUint32(off + 42, true);
+          const nombre = new TextDecoder('utf-8').decode(u8.slice(off + 46, off + 46 + nombreLen));
+
+          if (localOff + 30 <= u8.length) {
+            const nombreLocalLen = dv.getUint16(localOff + 26, true);
+            const extraLocalLen = dv.getUint16(localOff + 28, true);
+            const inicio = localOff + 30 + nombreLocalLen + extraLocalLen;
+            archivos[nombre] = { metodo: metodo, bytes: u8.slice(inicio, inicio + comprimido) };
+          }
+          off += 46 + nombreLen + extraLen + comentarioLen;
+        }
+        return archivos;
+      }
+
+      async function inflarBytes(bytes) {
+        if (typeof DecompressionStream === 'undefined') {
+          throw new Error('este navegador no puede descomprimir XLSX');
+        }
+        const flujo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return new Uint8Array(await new Response(flujo).arrayBuffer());
+      }
+
+      async function leerXlsxBasico(file) {
+        const buffer = await file.arrayBuffer();
+        const zip = leerZip(buffer);
+        const hoja = zip['xl/worksheets/sheet1.xml'];
+        if (!hoja) throw new Error('no se encontró la primera hoja');
+
+        async function textoDe(entrada) {
+          if (!entrada) return '';
+          const bytes = entrada.metodo === 0 ? entrada.bytes : await inflarBytes(entrada.bytes);
+          return new TextDecoder('utf-8').decode(bytes);
+        }
+
+        const sstXml = await textoDe(zip['xl/sharedStrings.xml']);
+        const hojaXml = await textoDe(hoja);
+        const parser = new DOMParser();
+
+        const compartidos = [];
+        if (sstXml) {
+          const docSst = parser.parseFromString(sstXml, 'application/xml');
+          if (docSst.getElementsByTagName('parsererror').length) throw new Error('el texto compartido está dañado');
+          Array.from(docSst.getElementsByTagName('si')).forEach(si => {
+            compartidos.push(Array.from(si.getElementsByTagName('t')).map(t => t.textContent).join(''));
+          });
+        }
+
+        const docHoja = parser.parseFromString(hojaXml, 'application/xml');
+        if (docHoja.getElementsByTagName('parsererror').length) throw new Error('la hoja está dañada');
+
+        const filas = [];
+        Array.from(docHoja.getElementsByTagName('row')).forEach(fila => {
+          const valores = [];
+          Array.from(fila.getElementsByTagName('c')).forEach(celda => {
+            const ref = celda.getAttribute('r') || '';
+            const letras = ref.replace(/[0-9]/g, '');
+            let col = 0;
+            for (let i = 0; i < letras.length; i++) col = col * 26 + (letras.charCodeAt(i) - 64);
+            col = Math.max(0, col - 1);
+
+            const tipo = celda.getAttribute('t');
+            let valor = '';
+            if (tipo === 's') {
+              const v = celda.getElementsByTagName('v')[0];
+              valor = v ? (compartidos[Number(v.textContent)] || '') : '';
+            } else if (tipo === 'inlineStr') {
+              valor = Array.from(celda.getElementsByTagName('t')).map(t => t.textContent).join('');
+            } else {
+              const v = celda.getElementsByTagName('v')[0];
+              valor = v ? v.textContent : '';
+            }
+            valores[col] = valor;
+          });
+          if (valores.some(v => String(v || '').trim() !== '')) filas.push(valores);
+        });
+
+        if (filas.length < 2) throw new Error('la hoja no tiene filas de datos');
+        return { headers: filas[0], rows: filas.slice(1) };
+      }
+
       function runUploadValidation() {
         const errors = [];
         const valid = [];
-        const seenKeys = new Set();
+        const claves = new Set();
         let duplicates = 0;
 
         ui.uploadRawRows.forEach((cols, idx) => {
-          const rowNum = idx + 2;
-          const fecha = (cols[ui.uploadMap.fecha] || '').trim();
+          const fila = idx + 2;
+          const fechaCruda = (cols[ui.uploadMap.fecha] || '').trim();
           const punto = (cols[ui.uploadMap.punto] || '').trim();
           const mmRaw = (cols[ui.uploadMap.mm] || '').trim().replace(',', '.');
           const origen = (cols[ui.uploadMap.origen] || 'Archivo histórico').trim();
 
-          if (!punto) {
-            errors.push({ fila: rowNum, motivo: 'falta el punto' });
-            return;
-          }
-          if (!fecha || !/^\d{4}-\d{2}-\d{2}/.test(fecha)) {
-            errors.push({ fila: rowNum, motivo: 'la fecha no se entiende' });
-            return;
-          }
-          const mmVal = mmRaw === '' || mmRaw === '—' ? null : Number(mmRaw);
-          if (mmVal !== null && Number.isNaN(mmVal)) {
-            errors.push({ fila: rowNum, motivo: 'el valor de lluvia no es un número' });
-            return;
-          }
-          if (mmVal !== null && mmVal < 0) {
-            errors.push({ fila: rowNum, motivo: 'lluvia negativa' });
-            return;
+          if (!punto) { errors.push({ fila: fila, motivo: 'falta el punto' }); return; }
+
+          const fecha = normalizarFecha(fechaCruda);
+          if (!fecha) { errors.push({ fila: fila, motivo: 'la fecha no se entiende' }); return; }
+
+          let mmVal = null;
+          if (mmRaw !== '' && mmRaw !== '—' && mmRaw !== '-') {
+            mmVal = Number(mmRaw);
+            if (!Number.isFinite(mmVal)) {
+              errors.push({ fila: fila, motivo: 'el valor de lluvia no es un número' });
+              return;
+            }
+            if (mmVal < 0) { errors.push({ fila: fila, motivo: 'lluvia negativa' }); return; }
+            if (mmVal > 300) { errors.push({ fila: fila, motivo: 'lluvia sobre 300 mm' }); return; }
+            mmVal = Math.round(mmVal * 10) / 10;
           }
 
-          const key = `${fecha}|${punto}`;
-          if (seenKeys.has(key)) {
-            duplicates++;
-            return;
-          }
-          seenKeys.add(key);
-          valid.push({ fecha, punto, mm: mmVal, origen });
+          const clave = fecha + '|' + punto;
+          if (claves.has(clave)) { duplicates++; return; }
+          claves.add(clave);
+          valid.push({ fecha: fecha, punto: punto, mm: mmVal, origen: origen });
         });
 
         ui.uploadErrors = errors;
         ui.uploadDuplicates = duplicates;
         ui.uploadValidRows = valid;
         ui.uploadStep = 3;
+      }
+
+      /* Resumen real de un conjunto de filas: mes, hora, días con lluvia. */
+      function resumenDeArchivo(filas) {
+        const porPunto = {};
+        const porHora = new Array(24).fill(0);
+        const porDia = {};
+        let total = 0;
+
+        filas.forEach(r => {
+          const mm = (typeof r.mm === 'number') ? r.mm : 0;
+          total += mm;
+          porPunto[r.punto] = (porPunto[r.punto] || 0) + mm;
+
+          const dia = String(r.fecha).slice(0, 10);
+          porDia[dia] = (porDia[dia] || 0) + mm;
+
+          const m = String(r.fecha).match(/\s(\d{1,2}):(\d{2})/);
+          const hora = m ? Number(m[1]) : 0;
+          if (hora >= 0 && hora < 24) porHora[hora] += mm;
+        });
+
+        const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        let diaMax = '';
+        let mmMax = 0;
+        Object.keys(porDia).forEach(d => {
+          if (porDia[d] > mmMax) { mmMax = porDia[d]; diaMax = d; }
+        });
+
+        const rainyDays = Object.keys(porDia).filter(d => porDia[d] > 0).length;
+        const maxDay = diaMax
+          ? Number(diaMax.slice(8, 10)) + ' de ' + meses[Number(diaMax.slice(5, 7)) - 1] + ' (' + formatMm(mmMax) + ' mm)'
+          : 'Sin días con lluvia';
+
+        const byPoint = Object.keys(porPunto)
+          .map(nombre => ({ name: nombre, mm: Number(porPunto[nombre].toFixed(1)) }))
+          .sort((a, b) => b.mm - a.mm);
+
+        return {
+          summary: {
+            acumulado: Number(total.toFixed(1)),
+            maxDay: maxDay,
+            rainyDays: rainyDays
+          },
+          byPoint: byPoint,
+          byHour: porHora.map(v => Number(v.toFixed(1)))
+        };
+      }
+
+      function indicesDeArchivosPublicados() {
+        const indice = new Map();
+        (state.files || []).forEach(archivo => {
+          if (!Array.isArray(archivo.rows)) return;
+          archivo.rows.forEach((r, i) => {
+            const fecha = normalizarFecha(r.fecha) || String(r.fecha || '');
+            if (!fecha || !r.punto) return;
+            indice.set(fecha + '|' + r.punto, { archivo: archivo, indice: i });
+          });
+        });
+        return indice;
+      }
+
+      function publicarArchivoSubido() {
+        if (!ui.uploadValidRows.length) {
+          return { ok: false, motivo: 'sin-filas' };
+        }
+
+        const indice = indicesDeArchivosPublicados();
+        const quitar = new Map();
+        const finales = [];
+        let saltadas = 0;
+        let reemplazadas = 0;
+
+        ui.uploadValidRows.forEach(r => {
+          const clave = r.fecha + '|' + r.punto;
+          const existente = indice.get(clave);
+          if (existente) {
+            if (ui.uploadConflictRule === 'saltar') { saltadas++; return; }
+            if (ui.uploadConflictRule === 'reemplazar') {
+              const lista = quitar.get(existente.archivo) || new Set();
+              lista.add(existente.indice);
+              quitar.set(existente.archivo, lista);
+              reemplazadas++;
+            }
+          }
+          finales.push(r);
+          indice.set(clave, null);
+        });
+
+        quitar.forEach((indices, archivo) => {
+          archivo.rows = archivo.rows.filter((r, i) => !indices.has(i));
+          archivo.rowsCountLabel = archivo.rows.length + ' filas';
+          const res = resumenDeArchivo(archivo.rows);
+          archivo.summary = res.summary;
+          archivo.byPoint = res.byPoint;
+          archivo.byHour = res.byHour;
+        });
+        state.files = state.files.filter(f => Array.isArray(f.rows) && f.rows.length > 0);
+
+        if (!finales.length) {
+          return { ok: false, motivo: 'sin-filas-nuevas', saltadas: saltadas, reemplazadas: reemplazadas };
+        }
+
+        const resumen = resumenDeArchivo(finales);
+        const archivo = {
+          id: 'f-' + Date.now(),
+          name: ui.uploadFileName,
+          format: ui.uploadFormat || 'CSV',
+          rowsCountLabel: finales.length + ' filas',
+          updatedLabel: 'publicado hoy',
+          columnsRecognized: true,
+          publishedAt: Date.now(),
+          canUndo: true,
+          summary: resumen.summary,
+          byPoint: resumen.byPoint,
+          byHour: resumen.byHour,
+          rows: finales
+        };
+
+        state.files.unshift(archivo);
+        state.activeFileId = archivo.id;
+        return { ok: true, archivo: archivo, saltadas: saltadas, reemplazadas: reemplazadas };
       }
 
       function renderUploadWizard(inSheet) {
@@ -1779,6 +2370,7 @@
         `;
 
         if (s === 1) {
+          const borradores = Array.isArray(state.uploadDrafts) ? state.uploadDrafts : [];
           return `
             ${stepper}
             <div class="card-box">
@@ -1796,6 +2388,24 @@
                 </div>
               </div>
             </div>
+
+            ${borradores.length ? `
+              <h3 class="section-title mt-16 mb-8">Borradores guardados</h3>
+              <div class="row-list">
+                ${borradores.map(d => `
+                  <div class="item-row">
+                    <div class="row-main">
+                      <div class="row-title">${escapeHtml(d.nombre)}</div>
+                      <div class="row-sub">${d.validRows.length} filas · guardado ${escapeHtml(formatRelativeTime(Math.max(0, Math.round((Date.now() - d.guardadoEn) / 60000))))}</div>
+                    </div>
+                    <div class="flex-row">
+                      <button type="button" data-draft-resume="${d.id}">Retomar</button>
+                      <button type="button" class="btn-danger" data-draft-delete="${d.id}">Descartar</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
           `;
         }
 
@@ -1860,12 +2470,12 @@
           `;
         }
 
-        /* Paso 4: Publicar */
         const rules = [
           { id: 'saltar', label: 'Saltar fechas repetidas' },
           { id: 'mezclar', label: 'Mezclar manteniendo ambas' },
           { id: 'reemplazar', label: 'Reemplazar fechas existentes' }
         ];
+        const previo = resumenDeArchivo(ui.uploadValidRows);
 
         return `
           ${stepper}
@@ -1874,6 +2484,9 @@
             <div class="row-list mb-12">
               <div class="item-row"><strong>Archivo</strong><span>${escapeHtml(ui.uploadFileName)}</span></div>
               <div class="item-row"><strong>Filas válidas</strong><span>${ui.uploadValidRows.length} filas</span></div>
+              <div class="item-row"><strong>Acumulado</strong><span>${formatMm(previo.summary.acumulado)} mm</span></div>
+              <div class="item-row"><strong>Día más lluvioso</strong><span>${escapeHtml(previo.summary.maxDay)}</span></div>
+              <div class="item-row"><strong>Días con lluvia</strong><span>${previo.summary.rainyDays}</span></div>
               <div class="item-row"><strong>Fuente</strong><span>Carga histórica · Directiva</span></div>
             </div>
 
@@ -2122,6 +2735,7 @@
               <div class="mb-12">
                 <label class="field-label" for="avisarPhotoInput">Foto (opcional)</label>
                 <input type="file" id="avisarPhotoInput" accept="image/*" style="min-height:56px; padding:12px 0;" />
+                ${fotoHtml(ui.avisarPhoto, 'Foto del aviso')}
               </div>
               <button type="button" class="btn-primary btn-full" id="btnSendAvisar">Enviar aviso</button>
             `;
@@ -2186,12 +2800,48 @@
               <p><strong>Sector:</strong> ${escapeHtml(o.sector)}</p>
               <p><strong>Rol:</strong> ${o.rol === 'directiva' ? 'Directiva' : 'Observador'}</p>
               <p><strong>Estado:</strong> ${escapeHtml(o.estado)}</p>
-              <p><strong>Tarjeta terminada en:</strong> ${escapeHtml(o.card.slice(-2))}</p>
+              <p><strong>Tarjeta terminada en:</strong> ${escapeHtml(ultimosDos(o))}</p>
               <p><strong>Última lectura:</strong> ${escapeHtml(o.lastReading)}</p>
               ${o.motivoBaja ? `<p><strong>Motivo de suspensión:</strong> ${escapeHtml(o.motivoBaja)}</p>` : ''}
             </div>
             <p class="muted">Suspender a un observador no borra sus lecturas históricas.</p>
+            ${getRole() === 'directiva' ? `
+              <button type="button" class="btn-primary btn-full mt-12" id="btnResetObs" data-obs-id="${o.id}">Cambiar clave / Reponer tarjeta</button>
+            ` : ''}
           `;
+        } else if (ui.sheetType === 'obs-reset') {
+          const o = state.observers.find(x => x.id === ui.sheetData);
+          if (!o) { closeSheet(); return; }
+          titleEl.textContent = 'Clave y tarjeta';
+          if (ui.obsResetResult) {
+            bodyEl.innerHTML = `
+              <div class="card-box">
+                <h3 class="section-title mb-8">Tarjeta actualizada</h3>
+                <p class="muted mb-12">Anota estos datos y entrégaselos en mano. La clave anterior ya no sirve.</p>
+                <div class="readout-box" style="margin-bottom:12px;">
+                  <div>
+                    <div class="field-label" style="margin:0;">Tarjeta</div>
+                    <div style="font-family:var(--font-serif); font-size:40px; font-weight:600;">${escapeHtml(ui.obsResetResult.card)}</div>
+                  </div>
+                  <div>
+                    <div class="field-label" style="margin:0;">Clave</div>
+                    <div style="font-family:var(--font-serif); font-size:40px; font-weight:600;">${escapeHtml(ui.obsResetResult.pin)}</div>
+                  </div>
+                </div>
+                <p class="muted">Observador: ${escapeHtml(o.alias)} · ${escapeHtml(o.sector)}</p>
+              </div>
+              <button type="button" class="btn-primary btn-full" id="btnCloseResetObs">Listo</button>
+            `;
+          } else {
+            bodyEl.innerHTML = `
+              <p class="mb-12">Se generará una clave nueva de cuatro números para <strong>${escapeHtml(o.alias)}</strong>. La anterior deja de funcionar.</p>
+              <label class="flex-row mb-12" style="min-height:56px; gap:12px; cursor:pointer;">
+                <input type="checkbox" id="resetCardCheck" style="width:26px; height:26px; flex:none;" />
+                <span>Reponer también el número de tarjeta (útil si se perdió)</span>
+              </label>
+              <button type="button" class="btn-primary btn-full" id="btnDoResetObs" data-obs-id="${o.id}">Generar clave nueva</button>
+            `;
+          }
         } else if (ui.sheetType === 'obs-suspend') {
           const o = state.observers.find(x => x.id === ui.sheetData);
           if (!o) { closeSheet(); return; }
@@ -2230,19 +2880,66 @@
           `;
         } else if (ui.sheetType === 'obs-add') {
           titleEl.textContent = 'Agregar observador';
+          if (ui.obsAddResult) {
+            bodyEl.innerHTML = `
+              <div class="card-box">
+                <h3 class="section-title mb-8">Tarjeta creada</h3>
+                <p class="muted mb-12">Anota estos datos y entrégaselos en mano a ${escapeHtml(ui.obsAddResult.alias)}.</p>
+                <div class="readout-box" style="margin-bottom:12px;">
+                  <div>
+                    <div class="field-label" style="margin:0;">Tarjeta</div>
+                    <div style="font-family:var(--font-serif); font-size:40px; font-weight:600;">${escapeHtml(ui.obsAddResult.card)}</div>
+                  </div>
+                  <div>
+                    <div class="field-label" style="margin:0;">Clave</div>
+                    <div style="font-family:var(--font-serif); font-size:40px; font-weight:600;">${escapeHtml(ui.obsAddResult.pin)}</div>
+                  </div>
+                </div>
+                <p class="muted">La clave se puede cambiar después desde la ficha del observador.</p>
+              </div>
+              <button type="button" class="btn-primary btn-full" id="btnCloseAddObs">Listo</button>
+            `;
+          } else {
+            bodyEl.innerHTML = `
+              <p class="muted mb-12">Acreditación presencial por junta de vecinos. Usa solo alias, nunca nombres reales.</p>
+              <div class="mb-12">
+                <label class="field-label" for="newObsAlias">Alias del observador</label>
+                <input type="text" id="newObsAlias" placeholder="Ej: Observadora San Gabriel" />
+              </div>
+              <div class="mb-12">
+                <label class="field-label" for="newObsSector">Sector</label>
+                <select id="newObsSector">
+                  ${state.roads.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('')}
+                </select>
+              </div>
+              <button type="button" class="btn-primary btn-full" id="btnSaveNewObs">Crear tarjeta acreditada</button>
+            `;
+          }
+        } else if (ui.sheetType === 'confirm') {
+          titleEl.textContent = ui.confirmTitulo || 'Confirmar';
           bodyEl.innerHTML = `
-            <p class="muted mb-12">Acreditación presencial por junta de vecinos. Usa solo alias, nunca nombres reales.</p>
-            <div class="mb-12">
-              <label class="field-label" for="newObsAlias">Alias del observador</label>
-              <input type="text" id="newObsAlias" placeholder="Ej: Observadora San Gabriel" />
+            <p class="mb-12">${escapeHtml(ui.confirmTexto)}</p>
+            <div class="flex-between">
+              <button type="button" id="btnCancelConfirm">Cancelar</button>
+              <button type="button" class="btn-danger" id="btnDoConfirm">Sí, continuar</button>
             </div>
-            <div class="mb-12">
-              <label class="field-label" for="newObsSector">Sector</label>
-              <select id="newObsSector">
-                ${state.roads.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('')}
-              </select>
+          `;
+        } else if (ui.sheetType === 'map-file-cols') {
+          const f = state.files.find(x => x.id === ui.mapFileId);
+          if (!f) { closeSheet(); return; }
+          const claves = Object.keys((f.rows && f.rows[0]) || {});
+          const mapa = ui.mapCols || { fecha: 'fecha', punto: 'punto', mm: 'mm', origen: 'origen' };
+          const opt = sel => claves.map(k => `<option value="${escapeHtml(k)}" ${k === sel ? 'selected' : ''}>${escapeHtml(k)}</option>`).join('');
+          titleEl.textContent = 'Cambiar columnas';
+          bodyEl.innerHTML = `
+            <p class="muted mb-12">El archivo trae columnas con otros nombres. Indica qué columna es cada cosa y se recalcula el tablero.</p>
+            <div class="two-col mb-12">
+              <div><label class="field-label" for="mapFileFecha">Fecha</label><select id="mapFileFecha">${opt(mapa.fecha)}</select></div>
+              <div><label class="field-label" for="mapFilePunto">Punto</label><select id="mapFilePunto">${opt(mapa.punto)}</select></div>
+              <div><label class="field-label" for="mapFileMm">Lluvia (mm)</label><select id="mapFileMm">${opt(mapa.mm)}</select></div>
+              <div><label class="field-label" for="mapFileOrigen">Origen</label><select id="mapFileOrigen">${opt(mapa.origen)}</select></div>
             </div>
-            <button type="button" class="btn-primary btn-full" id="btnSaveNewObs">Crear tarjeta acreditada</button>
+            <button type="button" class="btn-primary btn-full" id="btnSaveMapCols">Aplicar columnas</button>
           `;
         } else if (ui.sheetType === 'upload-errors') {
           titleEl.textContent = 'Todos los errores';
@@ -2264,17 +2961,39 @@
       /* ------------------------------------------------------------------------
          17. MODO KIOSCO (1920×1080 · ROTACIÓN CADA 15s · 5 TOQUES PARA SALIR)
          ------------------------------------------------------------------------ */
+      function estacionesKiosco() {
+        return state.stations.slice().sort((a, b) => {
+          const ra = severityRank(computeRainState(a.rainfall_mm, a.minutesAgo, a.hasSensor));
+          const rb = severityRank(computeRainState(b.rainfall_mm, b.minutesAgo, b.hasSensor));
+          if (ra !== rb) return ra - rb;
+          return String(a.name).localeCompare(String(b.name), 'es');
+        });
+      }
+
+      function paginasKiosco() {
+        return Math.max(1, Math.ceil(estacionesKiosco().length / 3));
+      }
+
+      function moverKiosco(delta) {
+        const total = paginasKiosco();
+        ui.kioscoPage = ((ui.kioscoPage + delta) % total + total) % total;
+        renderKiosco();
+      }
+
       function openKiosco() {
         closeSheet();
+        ui.lastFocusEl = document.activeElement;
+        const shellK = document.getElementById('appShell');
+        if (shellK) shellK.setAttribute('aria-hidden', 'true');
         ui.kioscoActive = true;
         ui.kioscoTapCount = 0;
-        ui.kioscoFocusIdx = 0;
+        ui.kioscoPage = 0;
         document.getElementById('kioscoOverlay').classList.remove('hidden');
         renderKiosco();
         if (ui.kioscoTimer) clearInterval(ui.kioscoTimer);
         ui.kioscoTimer = setInterval(() => {
-          ui.kioscoFocusIdx = (ui.kioscoFocusIdx + 1) % 3;
-          renderKiosco();
+          if (paginasKiosco() > 1) moverKiosco(1);
+          else renderKiosco();
         }, 15000);
       }
 
@@ -2282,21 +3001,39 @@
         ui.kioscoActive = false;
         if (ui.kioscoTimer) clearInterval(ui.kioscoTimer);
         document.getElementById('kioscoOverlay').classList.add('hidden');
+        const shellK = document.getElementById('appShell');
+        if (shellK) shellK.removeAttribute('aria-hidden');
+        const volverK = ui.lastFocusEl;
+        ui.lastFocusEl = null;
+        if (volverK && typeof volverK.focus === 'function') {
+          try { volverK.focus(); } catch (e) {}
+        }
       }
 
       function renderKiosco() {
-        const ids = ['san-alfonso', 'el-melocoton', 'el-manzano'];
-        const points = ids.map(id => state.stations.find(s => s.id === id)).filter(Boolean);
+        const ordenadas = estacionesKiosco();
+        const total = ordenadas.length;
+        const paginas = Math.max(1, Math.ceil(total / 3));
+        ui.kioscoPage = ((ui.kioscoPage % paginas) + paginas) % paginas;
+
+        const desde = ui.kioscoPage * 3;
+        const points = ordenadas.slice(desde, desde + 3);
 
         document.getElementById('kioscoTopInfo').textContent = `Actualizado ${state.updatedLabel}`;
-        document.getElementById('kioscoClock').textContent = `Lunes 23 de noviembre · Sede Comunitaria`;
+        document.getElementById('kioscoClock').textContent = fechaLargaChile() + ' · Sede Comunitaria';
 
-        document.getElementById('kioscoGrid').innerHTML = points.map((p, idx) => {
+        const modo = document.getElementById('kioscoFootMode');
+        if (modo) {
+          modo.textContent = total > 3
+            ? `${desde + 1}–${Math.min(desde + 3, total)} de ${total} · rota cada 15 s`
+            : `${total} ${total === 1 ? 'punto' : 'puntos'} · al día`;
+        }
+
+        document.getElementById('kioscoGrid').innerHTML = points.map(p => {
           const st = computeRainState(p.rainfall_mm, p.minutesAgo, p.hasSensor);
           const roadLine = getRoadLineForStation(p.id);
-          const focusCls = idx === ui.kioscoFocusIdx ? 'k-focus' : '';
           return `
-            <article class="kiosco-card k-${st} ${focusCls}">
+            <article class="kiosco-card k-${st}">
               <div class="flex-between">
                 <h2 style="font-family:var(--font-serif); font-size:36px; margin:0;">${escapeHtml(p.name)}</h2>
                 <span class="k-text-${st}" style="display:inline-flex; align-items:center; gap:10px; font-size:26px; font-weight:700;">
@@ -2390,7 +3127,10 @@
         const btnBack = document.getElementById('btnBackToLluvia');
         if (btnBack) btnBack.onclick = () => navigate('ahora', 'lluvia');
         const btnAvZ = document.getElementById('btnAvisarFromZone');
-        if (btnAvZ) btnAvZ.onclick = () => openSheet('avisar');
+        if (btnAvZ) btnAvZ.onclick = () => {
+          const zona = state.stations.find(x => x.id === ui.zoneId);
+          openSheet('avisar', { pointName: zona ? zona.name : null });
+        };
         const btnZCam = document.getElementById('btnZoneToCamino');
         if (btnZCam) btnZCam.onclick = () => navigate('camino', 'estado');
         const btnZAl = document.getElementById('btnZoneToAlertas');
@@ -2436,7 +3176,13 @@
         const infPhoto = document.getElementById('informPhotoInput');
         if (infPhoto) {
           infPhoto.onchange = () => {
-            ui.informPhoto = infPhoto.files && infPhoto.files[0] ? infPhoto.files[0].name : '';
+            const archivo = infPhoto.files && infPhoto.files[0];
+            if (!archivo) { ui.informPhoto = ''; renderAll(); return; }
+            comprimirImagenFile(archivo, function (res) {
+              if (!res) { showToast('No se pudo preparar la foto. Prueba con otra imagen.'); return; }
+              ui.informPhoto = res;
+              renderAll();
+            });
           };
         }
         const btnSendInf = document.getElementById('btnSendInform');
@@ -2451,12 +3197,14 @@
               tipo: ui.informChip,
               suggested_state: ui.informState,
               nota: ui.informNote.trim(),
+              foto: ui.informPhoto || null,
               hora: 'ahora',
               estado: 'En revisión',
               source: 'Vecino'
             });
             saveState();
             ui.informSent = true;
+            ui.informPhoto = '';
             renderAll();
           };
         }
@@ -2495,8 +3243,8 @@
         const btnRegN2 = document.getElementById('btnRegNext2');
         if (btnRegN2) {
           btnRegN2.onclick = () => {
-            if (!ui.regSinDato && ui.regValueStr === '') {
-              showToast('Ingresa un número o marca «No puedo leerlo».');
+            if (!ui.regSinDato && (ui.regValueStr === '' || !mmTextoValido(ui.regValueStr))) {
+              showToast('Ingresa entre 0 y 300 mm, o marca «No puedo leerlo».');
               return;
             }
             navigate('registrar', 'revisar');
@@ -2508,8 +3256,14 @@
         const regPhoto = document.getElementById('regPhotoInput');
         if (regPhoto) {
           regPhoto.onchange = () => {
-            ui.regPhoto = regPhoto.files && regPhoto.files[0] ? regPhoto.files[0].name : '';
-            renderAll();
+            const archivo = regPhoto.files && regPhoto.files[0];
+            if (!archivo) { ui.regPhoto = ''; ui.regPhotoNombre = ''; renderAll(); return; }
+            comprimirImagenFile(archivo, function (res) {
+              if (!res) { showToast('No se pudo preparar la foto. Prueba con otra imagen.'); return; }
+              ui.regPhoto = res;
+              ui.regPhotoNombre = res.nombre;
+              renderAll();
+            });
           };
         }
         const btnRegSub = document.getElementById('btnRegSubmit');
@@ -2520,6 +3274,7 @@
           ui.regValueStr = '';
           ui.regSinDato = false;
           ui.regPhoto = '';
+          ui.regPhotoNombre = '';
           navigate('registrar', 'lectura');
         };
         const btnRegAh = document.getElementById('btnRegGoAhora');
@@ -2541,7 +3296,13 @@
         });
         document.querySelectorAll('[data-undo-publish]').forEach(b => {
           b.onclick = () => {
-            state.files = state.files.filter(f => f.id !== b.dataset.undoPublish);
+            const archivo = state.files.find(f => f.id === b.dataset.undoPublish);
+            if (!archivo) return;
+            if (!archivo.publishedAt || Date.now() - archivo.publishedAt >= 24 * 60 * 60 * 1000) {
+              showToast('Ya pasaron las 24 horas: la publicación queda en el archivo.');
+              return;
+            }
+            state.files = state.files.filter(f => f.id !== archivo.id);
             saveState();
             showToast('Publicación deshecha.');
             renderAll();
@@ -2553,9 +3314,48 @@
         if (btnT2B) btnT2B.onclick = () => navigate('archivo', 'tablero');
         const btnMapC = document.getElementById('btnBoardMapCols');
         if (btnMapC) btnMapC.onclick = () => {
-          const f = state.files.find(x => x.id === state.activeFileId);
-          if (f) { f.columnsRecognized = true; saveState(); showToast('Columnas mapeadas a fecha, punto y lluvia.'); renderAll(); }
+          const f = state.files.find(x => x.id === state.activeFileId) || state.files[0];
+          if (!f || !f.rows || !f.rows.length) return;
+          const claves = Object.keys(f.rows[0]);
+          ui.mapFileId = f.id;
+          ui.mapCols = {
+            fecha: claves.indexOf('fecha') >= 0 ? 'fecha' : claves[0],
+            punto: claves.indexOf('punto') >= 0 ? 'punto' : (claves[1] || claves[0]),
+            mm: claves.find(k => /mm|lluvia|rain/i.test(k)) || claves[2] || claves[0],
+            origen: claves.indexOf('origen') >= 0 ? 'origen' : (claves[3] || claves[0])
+          };
+          openSheet('map-file-cols');
         };
+        document.querySelectorAll('#btnGoArchivosFromEmpty').forEach(b => {
+          b.onclick = () => navigate('archivo', 'archivos');
+        });
+
+        const selPunto = document.getElementById('tablaPunto');
+        if (selPunto) {
+          selPunto.onchange = () => {
+            ui.tablaPunto = selPunto.value;
+            state.tablePage = 1;
+            saveState();
+            renderAll();
+          };
+        }
+        const inpTexto = document.getElementById('tablaTexto');
+        if (inpTexto) {
+          let espera = null;
+          inpTexto.oninput = () => {
+            ui.tablaTexto = inpTexto.value;
+            if (espera) clearTimeout(espera);
+            espera = setTimeout(() => {
+              state.tablePage = 1;
+              renderAll();
+              const nuevo = document.getElementById('tablaTexto');
+              if (nuevo) {
+                nuevo.focus();
+                try { nuevo.setSelectionRange(nuevo.value.length, nuevo.value.length); } catch (e) {}
+              }
+            }, 220);
+          };
+        }
         const btnPrev = document.getElementById('btnPagePrev');
         if (btnPrev) btnPrev.onclick = () => { state.tablePage = Math.max(1, state.tablePage - 1); renderAll(); };
         const btnNext = document.getElementById('btnPageNext');
@@ -2610,6 +3410,10 @@
         document.querySelectorAll('[data-view-obs]').forEach(b => {
           b.onclick = () => openSheet('obs-detail', b.dataset.viewObs);
         });
+        const btnResetObs = document.getElementById('btnResetObs');
+        if (btnResetObs) {
+          btnResetObs.onclick = () => { ui.obsResetResult = null; openSheet('obs-reset', btnResetObs.dataset.obsId); };
+        }
         document.querySelectorAll('[data-toggle-obs]').forEach(b => {
           b.onclick = () => {
             const o = state.observers.find(x => x.id === b.dataset.toggleObs);
@@ -2642,6 +3446,20 @@
             fileResp.value = '';
           };
         }
+        const btnSync = document.getElementById('btnSyncNow');
+        if (btnSync) {
+          btnSync.onclick = () => {
+            btnSync.disabled = true;
+            ALMACEN.sincronizarAhora(state).then(function (r) {
+              if (r && r.ok) {
+                showToast('Estado publicado en el servidor.');
+              } else {
+                showToast('No se pudo sincronizar: ' + ((r && r.error) || 'sin conexión') + '.');
+              }
+              renderAll();
+            });
+          };
+        }
         const btnSemilla = document.getElementById('btnRestaurarSemilla');
         if (btnSemilla) btnSemilla.onclick = restaurarSemilla;
         const btnPunto = document.getElementById('btnNuevoPunto');
@@ -2657,12 +3475,33 @@
         const btnResetDemo = document.getElementById('btnResetDemoData');
         if (btnResetDemo) {
           btnResetDemo.onclick = () => {
-            state = buildInitialState();
-            saveState();
-            showToast('Datos de ejemplo restablecidos.');
-            navigate('ahora', 'lluvia');
+            openConfirm(
+              'Restablecer datos de ejemplo',
+              'Se reemplaza el estado de este equipo por la semilla. No se puede deshacer sin un respaldo.',
+              function () {
+                state = buildInitialState();
+                saveState();
+                showToast('Datos de ejemplo restablecidos.');
+                navigate('ahora', 'lluvia');
+              }
+            );
           };
         }
+
+        /* Flechas para moverse entre pestañas y solapas. */
+        ['desktopTabbar', 'subtabbar'].forEach(function (id) {
+          const barra = document.getElementById(id);
+          if (!barra) return;
+          barra.onkeydown = function (e) {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            const items = Array.from(barra.querySelectorAll('[role="tab"]')).filter(el => el.offsetParent !== null);
+            const idx = items.indexOf(document.activeElement);
+            if (idx < 0) return;
+            e.preventDefault();
+            const paso = e.key === 'ArrowRight' ? 1 : -1;
+            items[(idx + paso + items.length) % items.length].focus();
+          };
+        });
 
         /* Subida de históricos (en pestaña Directiva › Subir) */
         bindUploadWizardEvents(false);
@@ -2670,6 +3509,7 @@
 
       function bindUploadWizardEvents(inSheet) {
         const rerender = () => inSheet ? renderSheet() : renderAll();
+
         const fileInp = document.getElementById('uploadFileInput');
         if (fileInp) {
           fileInp.onchange = () => {
@@ -2687,16 +3527,23 @@
               return;
             }
             if (ext === 'xlsx') {
-              /* En entorno 100% sin dependencias externas, reconocemos el archivo y cargamos vista estructurada */
-              const demoText = 'fecha,punto,lluvia_mm,origen\n2026-11-18 08:00,San Alfonso,12.4,Planilla XLSX\n2026-11-18 08:15,El Melocotón,5.8,Planilla XLSX\n2026-11-18 08:30,El Manzano,1.2,Planilla XLSX';
-              parseDelimitedText(demoText, f.name);
-              ui.uploadFormat = 'XLSX';
-              rerender();
+              ui.uploadErrorMsg = '';
+              leerXlsxBasico(f).then(function (datos) {
+                aplicarTabla(datos.headers, datos.rows, f.name, 'XLSX');
+                rerender();
+              }).catch(function (e) {
+                ui.uploadErrorMsg = 'No se pudo leer el XLSX (' + e.message + '). Guárdalo como CSV y vuelve a intentar.';
+                rerender();
+              });
               return;
             }
             const reader = new FileReader();
             reader.onload = () => {
               parseDelimitedText(String(reader.result || ''), f.name);
+              rerender();
+            };
+            reader.onerror = () => {
+              ui.uploadErrorMsg = 'No se pudo leer el archivo.';
               rerender();
             };
             reader.readAsText(f, 'UTF-8');
@@ -2713,9 +3560,10 @@
               '2026-11-20 08:15,El Melocotón,7.4,Observador El Melocotón',
               '2026-11-20 08:30,,3.1,Observador',
               'sin-fecha,El Manzano,2.0,Observadora El Manzano',
-              '2026-11-20 09:00,El Canelo,-4.5,Observadora El Canelo',
-              '2026-11-20 09:15,El Manzano,1.8,Observadora El Manzano',
-              '2026-11-20 09:30,San Gabriel,4.2,Observador San Gabriel'
+              '20/11/2026 09:00,El Canelo,-4.5,Observadora El Canelo',
+              '20-11-2026 09:15,El Manzano,1.8,Observadora El Manzano',
+              '2026-11-20 09:30,San Gabriel,4.2,Observador San Gabriel',
+              '2026-11-20 10:00,Los Maitenes,3.3,Planilla oficial'
             ].join('\n');
             parseDelimitedText(sampleCsv, 'historico_prueba_noviembre.csv');
             rerender();
@@ -2750,47 +3598,103 @@
         document.querySelectorAll('[data-conflict-rule]').forEach(b => {
           b.onclick = () => { ui.uploadConflictRule = b.dataset.conflictRule; rerender(); };
         });
+
         const btnDraft = document.getElementById('btnUpDraft');
         if (btnDraft) {
           btnDraft.onclick = () => {
-            showToast('Borrador guardado. No se publicó todavía.');
+            state.uploadDrafts = Array.isArray(state.uploadDrafts) ? state.uploadDrafts : [];
+            state.uploadDrafts.unshift({
+              id: 'D-' + Date.now(),
+              nombre: ui.uploadFileName,
+              formato: ui.uploadFormat,
+              headers: ui.uploadHeaders,
+              rows: ui.uploadRawRows,
+              map: ui.uploadMap,
+              validRows: ui.uploadValidRows,
+              errors: ui.uploadErrors,
+              duplicates: ui.uploadDuplicates,
+              conflictRule: ui.uploadConflictRule,
+              guardadoEn: Date.now()
+            });
+            saveState();
             resetUploadWizard();
-            if (inSheet) closeSheet();
-            renderAll();
+            rerender();
+            showToast('Borrador guardado. Se retoma desde el paso 1.');
           };
         }
+
+        document.querySelectorAll('[data-draft-resume]').forEach(b => {
+          b.onclick = () => {
+            const d = (state.uploadDrafts || []).find(x => x.id === b.dataset.draftResume);
+            if (!d) return;
+            ui.uploadFileName = d.nombre;
+            ui.uploadFormat = d.formato;
+            ui.uploadHeaders = d.headers || [];
+            ui.uploadRawRows = d.rows || [];
+            ui.uploadMap = d.map || { fecha: 0, punto: 1, mm: 2, origen: 3 };
+            ui.uploadValidRows = d.validRows || [];
+            ui.uploadErrors = d.errors || [];
+            ui.uploadDuplicates = d.duplicates || 0;
+            ui.uploadConflictRule = d.conflictRule || 'saltar';
+            ui.uploadStep = 4;
+            rerender();
+          };
+        });
+
+        document.querySelectorAll('[data-draft-delete]').forEach(b => {
+          b.onclick = () => {
+            state.uploadDrafts = (state.uploadDrafts || []).filter(x => x.id !== b.dataset.draftDelete);
+            saveState();
+            rerender();
+            showToast('Borrador descartado.');
+          };
+        });
+
         const btnPub = document.getElementById('btnUpPublish');
         if (btnPub) {
           btnPub.onclick = () => {
-            const totalMm = ui.uploadValidRows.reduce((acc, r) => acc + (r.mm || 0), 0);
-            const byPtMap = {};
-            state.stations.forEach(st => { byPtMap[st.name] = 0; });
-            ui.uploadValidRows.forEach(r => {
-              if (byPtMap[r.punto] !== undefined) byPtMap[r.punto] += (r.mm || 0);
-            });
-            const newFile = {
-              id: 'f-' + Date.now(),
-              name: ui.uploadFileName,
-              format: ui.uploadFormat || 'CSV',
-              rowsCountLabel: `${ui.uploadValidRows.length} filas`,
-              updatedLabel: 'publicado hoy',
-              columnsRecognized: true,
-              publishedAt: Date.now(),
-              canUndo: true,
-              summary: { acumulado: Number(totalMm.toFixed(1)), maxDay: 'Según archivo cargado', rainyDays: Math.max(1, ui.uploadValidRows.length) },
-              byPoint: Object.keys(byPtMap).map(k => ({ name: k, mm: Number(byPtMap[k].toFixed(1)) })),
-              byHour: [0,0,0,0,0,0,0,1,4,6,3,2,1,1,2,3,4,5,3,2,1,0,0,0],
-              rows: ui.uploadValidRows
-            };
-            state.files.unshift(newFile);
-            state.activeFileId = newFile.id;
+            const res = publicarArchivoSubido();
+            if (!res.ok) {
+              if (res.motivo === 'sin-filas-nuevas') {
+                showToast('Nada nuevo: las ' + res.saltadas + ' filas ya existían en los archivos publicados.');
+              } else {
+                showToast('No hay filas válidas para publicar.');
+              }
+              return;
+            }
             saveState();
             resetUploadWizard();
             if (inSheet) closeSheet();
-            showToast('Archivo publicado en Archivo › Archivos (24 h para deshacer).');
+            showToast('Publicado: ' + res.archivo.rowsCountLabel + '. Tienes 24 horas para deshacer.');
             navigate('archivo', 'archivos');
           };
         }
+      }
+
+      function pulsarLogin(val) {
+        if (val === 'Limpiar') {
+          if (ui.loginFocusField === 'card') ui.loginCard = '';
+          else ui.loginPin = '';
+        } else if (val === '←') {
+          if (ui.loginFocusField === 'pin') {
+            if (ui.loginPin.length > 0) ui.loginPin = ui.loginPin.slice(0, -1);
+            else ui.loginFocusField = 'card';
+          } else {
+            ui.loginCard = ui.loginCard.slice(0, -1);
+          }
+        } else {
+          if (ui.loginFocusField === 'card') {
+            if (ui.loginCard.length < 8) ui.loginCard += val;
+            if (ui.loginCard.length === 8) ui.loginFocusField = 'pin';
+          } else if (ui.loginPin.length < 4) {
+            ui.loginPin += val;
+          }
+        }
+        renderSheet();
+        const destino = ui.loginFocusField === 'pin'
+          ? document.getElementById('loginPinBtn')
+          : document.getElementById('loginCardInput');
+        if (destino) destino.focus();
       }
 
       function bindSheetEvents() {
@@ -2808,28 +3712,7 @@
           if (pinBtn) pinBtn.onclick = () => { ui.loginFocusField = 'pin'; renderSheet(); };
 
           document.querySelectorAll('#loginNumpad .numpad-key').forEach(k => {
-            k.onclick = () => {
-              const val = k.dataset.loginkey;
-              if (val === 'Limpiar') {
-                if (ui.loginFocusField === 'card') ui.loginCard = '';
-                else ui.loginPin = '';
-              } else if (val === '←') {
-                if (ui.loginFocusField === 'pin') {
-                  if (ui.loginPin.length > 0) ui.loginPin = ui.loginPin.slice(0, -1);
-                  else ui.loginFocusField = 'card';
-                } else {
-                  ui.loginCard = ui.loginCard.slice(0, -1);
-                }
-              } else {
-                if (ui.loginFocusField === 'card') {
-                  if (ui.loginCard.length < 8) ui.loginCard += val;
-                  if (ui.loginCard.length === 8) ui.loginFocusField = 'pin';
-                } else {
-                  if (ui.loginPin.length < 4) ui.loginPin += val;
-                }
-              }
-              renderSheet();
-            };
+            k.onclick = () => pulsarLogin(k.dataset.loginkey);
           });
 
           const btnDo = document.getElementById('btnDoLogin');
@@ -2848,6 +3731,18 @@
           });
           const nInp = document.getElementById('avisarNotaInput');
           if (nInp) nInp.oninput = () => { ui.avisarNota = nInp.value; };
+          const aPhoto = document.getElementById('avisarPhotoInput');
+          if (aPhoto) {
+            aPhoto.onchange = () => {
+              const archivo = aPhoto.files && aPhoto.files[0];
+              if (!archivo) { ui.avisarPhoto = ''; renderSheet(); return; }
+              comprimirImagenFile(archivo, function (res) {
+                if (!res) { showToast('No se pudo preparar la foto. Prueba con otra imagen.'); return; }
+                ui.avisarPhoto = res;
+                renderSheet();
+              });
+            };
+          }
           const btnSendA = document.getElementById('btnSendAvisar');
           if (btnSendA) {
             btnSendA.onclick = () => {
@@ -2861,6 +3756,7 @@
                 tipo: ui.avisarTipo,
                 suggested_state: sug,
                 nota: ui.avisarNota.trim(),
+                foto: ui.avisarPhoto || null,
                 hora: 'ahora',
                 estado: 'En revisión',
                 source: 'Vecino'
@@ -2882,6 +3778,7 @@
                 r.source = state.session.alias;
                 r.timeLabel = 'ahora';
                 r.todayLog.unshift({ hora: 'Ahora', state: r.state, source: state.session.alias, note: 'Estado confirmado en terreno.' });
+                state.updatedLabel = 'hoy a las ' + horaLocalHHMM();
                 saveState();
                 showToast(`Tramo ${r.name} confirmado.`);
                 renderSheet();
@@ -2927,6 +3824,85 @@
         } else if (ui.sheetType === 'punto') {
           const btn = document.getElementById('btnSavePunto');
           if (btn) btn.onclick = guardarPunto;
+        } else if (ui.sheetType === 'confirm') {
+          const btnNo = document.getElementById('btnCancelConfirm');
+          if (btnNo) btnNo.onclick = closeSheet;
+          const btnSi = document.getElementById('btnDoConfirm');
+          if (btnSi) {
+            btnSi.onclick = () => {
+              const accion = ui.confirmAccion;
+              ui.confirmAccion = null;
+              closeSheet();
+              if (accion) accion();
+            };
+          }
+        } else if (ui.sheetType === 'map-file-cols') {
+          const btn = document.getElementById('btnSaveMapCols');
+          if (btn) {
+            btn.onclick = () => {
+              const f = state.files.find(x => x.id === ui.mapFileId);
+              if (!f) return;
+              const mapa = {
+                fecha: document.getElementById('mapFileFecha').value,
+                punto: document.getElementById('mapFilePunto').value,
+                mm: document.getElementById('mapFileMm').value,
+                origen: document.getElementById('mapFileOrigen').value
+              };
+              if (new Set(Object.values(mapa)).size < 4) {
+                showToast('Elige una columna distinta para cada campo.');
+                return;
+              }
+              const filas = f.rows.map(r => {
+                const mmTxt = String(r[mapa.mm] === undefined ? '' : r[mapa.mm]).replace(',', '.');
+                const mmNum = Number(mmTxt);
+                return {
+                  fecha: normalizarFecha(r[mapa.fecha]) || String(r[mapa.fecha] || ''),
+                  punto: String(r[mapa.punto] || '').trim(),
+                  mm: (mmTxt === '' || !Number.isFinite(mmNum)) ? null : Math.round(mmNum * 10) / 10,
+                  origen: String(r[mapa.origen] || 'Archivo histórico')
+                };
+              }).filter(r => r.punto && r.fecha);
+              if (!filas.length) { showToast('Con esas columnas no queda ninguna fila válida.'); return; }
+              const res = resumenDeArchivo(filas);
+              f.rows = filas;
+              f.summary = res.summary;
+              f.byPoint = res.byPoint;
+              f.byHour = res.byHour;
+              f.rowsCountLabel = filas.length + ' filas';
+              f.columnsRecognized = true;
+              saveState();
+              closeSheet();
+              renderAll();
+              showToast('Columnas aplicadas: resumen recalculado.');
+            };
+          }
+        } else if (ui.sheetType === 'obs-detail') {
+          const btnReset = document.getElementById('btnResetObs');
+          if (btnReset) {
+            btnReset.onclick = () => { ui.obsResetResult = null; openSheet('obs-reset', btnReset.dataset.obsId); };
+          }
+        } else if (ui.sheetType === 'obs-reset') {
+          const btnDo = document.getElementById('btnDoResetObs');
+          if (btnDo) {
+            btnDo.onclick = () => {
+              const o = state.observers.find(x => x.id === btnDo.dataset.obsId);
+              if (!o) return;
+              const check = document.getElementById('resetCardCheck');
+              const pin = pinAleatorio();
+              const card = (check && check.checked) ? tarjetaLibre() : String(o.card || tarjetaLibre());
+              o.pin = pin;
+              o.card = card;
+              o.cardLast2 = card.slice(-2);
+              ui.obsResetResult = { card: card, pin: pin };
+              saveState();
+              renderSheet();
+              showToast('Clave actualizada. Anótala antes de cerrar.');
+            };
+          }
+          const btnFin = document.getElementById('btnCloseResetObs');
+          if (btnFin) {
+            btnFin.onclick = () => { ui.obsResetResult = null; closeSheet(); renderAll(); };
+          }
         } else if (ui.sheetType === 'obs-add') {
           const btnSaveO = document.getElementById('btnSaveNewObs');
           if (btnSaveO) {
@@ -2938,24 +3914,29 @@
                 showToast('Escribe un alias para el observador.');
                 return;
               }
-              const cardNum = String(10042100 + state.observers.length);
+              const cardNum = tarjetaLibre();
+              const pin = pinAleatorio();
               state.observers.push({
-                id: 'OBS-' + String(state.observers.length + 1).padStart(2, '0'),
+                id: idObservadorLibre(),
                 alias,
                 sector: sec ? sec.name : 'San Alfonso',
                 sector_id: secId,
                 rol: 'observador',
                 estado: 'Acreditado',
                 card: cardNum,
-                pin: '1234',
+                cardLast2: cardNum.slice(-2),
+                pin: pin,
                 lastReading: 'sin lecturas',
                 motivoBaja: null
               });
               saveState();
-              showToast(`Observador creado. Tarjeta ${cardNum} · clave inicial 1234.`);
-              closeSheet();
-              renderAll();
+              ui.obsAddResult = { alias: alias, card: cardNum, pin: pin };
+              renderSheet();
             };
+          }
+          const btnFinAdd = document.getElementById('btnCloseAddObs');
+          if (btnFinAdd) {
+            btnFinAdd.onclick = () => { ui.obsAddResult = null; closeSheet(); renderAll(); };
           }
         }
       }
@@ -2992,6 +3973,14 @@
         saveState();
         closeSheet();
         showToast(`Sesión iniciada: ${datos.alias}`);
+
+        /* Si venía de una ruta protegida, se retoma esa ruta. */
+        const pendiente = ui.pendingRoute;
+        ui.pendingRoute = null;
+        if (pendiente && pendiente.tab) {
+          navigate(pendiente.tab, pendiente.subtab, pendiente.zoneId);
+          return;
+        }
 
         /* §6: al entrar, el observador cae directo en Registrar › Identidad */
         if (datos.rol === 'observador') {
@@ -3052,6 +4041,35 @@
         }
       }
 
+      function ultimosDos(observador) {
+        if (!observador) return '••';
+        if (observador.cardLast2) return String(observador.cardLast2);
+        return observador.card ? String(observador.card).slice(-2) : '••';
+      }
+
+      function tarjetaLibre() {
+        const usadas = new Set(state.observers.map(o => String(o.card || '')).filter(Boolean));
+        let numero = '';
+        do {
+          numero = String(10042000 + Math.floor(Math.random() * 90000));
+        } while (usadas.has(numero));
+        return numero;
+      }
+
+      function pinAleatorio() {
+        return String(1000 + Math.floor(Math.random() * 9000));
+      }
+
+      function idObservadorLibre() {
+        let n = state.observers.length + 1;
+        let id = 'OBS-' + String(n).padStart(2, '0');
+        while (state.observers.some(o => o.id === id)) {
+          n += 1;
+          id = 'OBS-' + String(n).padStart(2, '0');
+        }
+        return id;
+      }
+
       function guardarOficial() {
         const puntoId = document.getElementById('ofPunto').value;
         const fecha = document.getElementById('ofFecha').value;
@@ -3074,7 +4092,7 @@
           id: 'MV-OF-' + Date.now(),
           station_id: st.id,
           point_name: st.name,
-          timestamp: `${fecha}T${hora}:00-03:00`,
+          timestamp: isoConOffsetChile(fecha, hora),
           timeLabel: etiquetaHora(fecha, hora),
           rainfall_mm: Math.round(mm * 10) / 10,
           estado_lectura: 'medida',
@@ -3097,13 +4115,23 @@
 
         state.readings.unshift(lectura);
 
-        /* Solo mueve el tablero si la medición es reciente; si es histórica,
-           queda en el archivo y no cambia el estado de ahora. */
+        /* Mueve el tablero solo si la medición está dentro de la ventana de
+           frescura. Si es más antigua, queda en el historial y se dice. */
         const minutos = (Date.now() - new Date(lectura.timestamp).getTime()) / 60000;
-        if (minutos >= -5 && minutos <= 90) {
-          applyReadingToStation(st.id, lectura.rainfall_mm, 'medida');
+        let mensaje = 'Lectura oficial guardada.';
+
+        if (minutos >= -5 && minutos <= THRESHOLDS.staleMinutes) {
+          applyReadingToStation(st.id, lectura.rainfall_mm, 'medida', {
+            minutesAgo: Math.max(0, Math.round(minutos)),
+            countAsObserver: false
+          });
+          mensaje = `Lectura oficial guardada: ${formatMm(lectura.rainfall_mm)} mm en ${st.name}.`;
+        } else if (minutos > THRESHOLDS.staleMinutes && minutos <= THRESHOLDS.ventanaTableroMin) {
+          mensaje = `Lectura guardada en el historial: tiene ${Math.round(minutos)} minutos, más de los ${THRESHOLDS.staleMinutes} de frescura. El tablero no cambia.`;
+        } else {
+          mensaje = 'Lectura histórica guardada en el archivo. El tablero de ahora no cambia.';
         }
-        state.updatedLabel = 'ahora';
+
         saveState();
 
         const campoMm = document.getElementById('ofMm');
@@ -3111,7 +4139,22 @@
         if (campoMm) campoMm.value = '';
         if (campoNota) campoNota.value = '';
         renderAll();
-        showToast('Lectura oficial guardada.');
+        showToast(mensaje);
+
+        if (ALMACEN && ALMACEN.configurado && typeof ALMACEN.registrarLectura === 'function') {
+          ALMACEN.registrarLectura({
+            punto: st.id,
+            mm: lectura.rainfall_mm,
+            medidaEn: lectura.timestamp,
+            origen: origen,
+            nota: nota,
+            oficial: true
+          }).then(function (r) {
+            if (r && r.ok === false && r.motivo === 'sin-conexion') {
+              showToast('Guardada en este equipo. No se pudo enviar al servidor.');
+            }
+          });
+        }
       }
 
       function slugPunto(nombre) {
@@ -3195,12 +4238,17 @@
           showToast('No se puede quitar: tiene lecturas. Desactívalo marcando «sin sensor».');
           return;
         }
-        if (!window.confirm('¿Quitar «' + st.name + '» del tablero y del camino?')) return;
-        state.stations = state.stations.filter(s => s.id !== id);
-        state.roads = state.roads.filter(r => r.id !== id);
-        saveState();
-        renderAll();
-        showToast('Punto quitado.');
+        openConfirm(
+          '¿Quitar «' + st.name + '»?',
+          'Dejará de aparecer en el tablero y en el camino. No tiene lecturas, así que no se pierde historial.',
+          function () {
+            state.stations = state.stations.filter(x => x.id !== id);
+            state.roads = state.roads.filter(x => x.id !== id);
+            saveState();
+            renderAll();
+            showToast('Punto quitado.');
+          }
+        );
       }
 
       function descargarRespaldo() {
@@ -3233,48 +4281,69 @@
       }
 
       function restaurarSemilla() {
-        state = buildInitialState();
-        saveState();
-        renderAll();
-        showToast('Datos de ejemplo restaurados.');
+        openConfirm(
+          'Restaurar datos de ejemplo',
+          'Se reemplaza todo lo guardado en este equipo por la semilla de ejemplo. Si tienes datos reales, descarga un respaldo antes.',
+          function () {
+            state = buildInitialState();
+            saveState();
+            renderAll();
+            showToast('Datos de ejemplo restaurados.');
+          }
+        );
       }
 
       function adjustRegVal(delta) {
         ui.regSinDato = false;
         const cur = ui.regValueStr === '' ? 0 : parseFloat(ui.regValueStr.replace(',', '.'));
-        const next = Math.max(0, Math.round((cur + delta) * 10) / 10);
+        const next = Math.min(300, Math.max(0, Math.round((cur + delta) * 10) / 10));
         ui.regValueStr = String(next).replace('.', ',');
         renderAll();
       }
 
       function handleRegNumpad(key) {
         ui.regSinDato = false;
+        let texto = ui.regValueStr;
+
         if (key === '←') {
-          ui.regValueStr = ui.regValueStr.slice(0, -1);
+          texto = texto.slice(0, -1);
         } else if (key === ',') {
-          if (!ui.regValueStr.includes(',')) {
-            ui.regValueStr = ui.regValueStr === '' ? '0,' : ui.regValueStr + ',';
-          }
+          if (!texto.includes(',')) texto = texto === '' ? '0,' : texto + ',';
+        } else if (texto === '0') {
+          texto = key;                      // evita «00»
         } else {
-          if (ui.regValueStr.length < 5) {
-            ui.regValueStr = ui.regValueStr === '0' ? key : ui.regValueStr + key;
-          }
+          texto = texto + key;
         }
+
+        if (!mmTextoValido(texto)) {
+          showToast('Entre 0 y 300 mm, con un decimal como máximo.');
+          return;
+        }
+        ui.regValueStr = texto;
         renderAll();
       }
 
       function submitObserverReading() {
         const s = state.session;
         if (!s) return;
-        const mmVal = ui.regSinDato ? null : parseFloat(ui.regValueStr.replace(',', '.'));
+
+        if (!ui.regSinDato && (ui.regValueStr === '' || !mmTextoValido(ui.regValueStr))) {
+          showToast('La lectura debe estar entre 0 y 300 mm, con un decimal.');
+          navigate('registrar', 'lectura');
+          return;
+        }
+
+        const mmVal = ui.regSinDato ? null : Math.round(parseFloat(ui.regValueStr.replace(',', '.')) * 10) / 10;
+        const fecha = ui.regIsBackdated ? ui.regDate : hoyLocalISO();
+        const hora = ui.regIsBackdated ? ui.regTime : horaLocalHHMM();
         const folio = 'MV-' + String(Math.floor(1000 + Math.random() * 9000));
 
         const newReading = {
           id: folio,
           station_id: s.sector_id,
           point_name: s.sector,
-          timestamp: ui.regIsBackdated ? `${ui.regDate}T${ui.regTime}:00-03:00` : new Date().toISOString(),
-          timeLabel: ui.regIsBackdated ? `${ui.regDate} ${ui.regTime}` : 'ahora',
+          timestamp: isoConOffsetChile(fecha, hora),
+          timeLabel: ui.regIsBackdated ? `${fecha} ${hora}` : 'ahora',
           rainfall_mm: mmVal,
           estado_lectura: ui.regSinDato ? 'sin_dato' : 'medida',
           temperature_c: null,
@@ -3297,6 +4366,22 @@
         if (obs) obs.lastReading = 'ahora';
         saveState();
         ui.regSubmittedFolio = folio;
+
+        if (ALMACEN && ALMACEN.configurado && typeof ALMACEN.registrarLectura === 'function') {
+          ALMACEN.registrarLectura({
+            punto: s.sector_id,
+            mm: mmVal,
+            medidaEn: newReading.timestamp,
+            origen: 'Observador acreditado',
+            nota: null,
+            oficial: false
+          }).then(function (r) {
+            if (r && r.ok === false && r.motivo === 'sin-conexion') {
+              showToast('Lectura guardada en este equipo. No se pudo enviar al servidor.');
+            }
+          });
+        }
+
         renderAll();
       }
 
@@ -3347,23 +4432,30 @@
         renderAll();
       }
 
-      function applyReadingToStation(stationId, mmVal, estadoLectura) {
+      function applyReadingToStation(stationId, mmVal, estadoLectura, opts) {
         const st = state.stations.find(x => x.id === stationId);
         if (!st) return;
+        const opciones = Object.assign({ minutesAgo: 0, countAsObserver: true }, opts || {});
+
         if (estadoLectura === 'sin_dato' || mmVal === null) {
           st.rainfall_mm = null;
           st.minutesAgo = null;
           st.timeText = 'sin lectura posible';
         } else {
           st.rainfall_mm = mmVal;
-          st.minutesAgo = 0;
+          st.minutesAgo = opciones.minutesAgo;
           st.timeText = null;
-          st.hasSensor = true;
-          st.hourly24h[23] = mmVal;
+          /* La serie de 24 h solo se toca si la lectura es de la última hora. */
+          if (opciones.minutesAgo <= 60 && Array.isArray(st.hourly24h) && st.hourly24h.length) {
+            st.hourly24h[st.hourly24h.length - 1] = mmVal;
+          }
         }
-        st.observerCount24h += 1;
-        st.lastObserverHour = 'ahora';
-        state.updatedLabel = 'ahora';
+
+        if (opciones.countAsObserver !== false) {
+          st.observerCount24h = (st.observerCount24h || 0) + 1;
+        }
+        st.lastObserverHour = opciones.minutesAgo <= 0 ? 'ahora' : formatRelativeTime(opciones.minutesAgo);
+        state.updatedLabel = 'hoy a las ' + horaLocalHHMM();
       }
 
       function resolveCurrentRoadReport(approve) {
@@ -3389,6 +4481,7 @@
               confirmedBy: 'Directiva'
             });
           }
+          state.updatedLabel = 'hoy a las ' + horaLocalHHMM();
           showToast(`Aviso validado. Tramo ${a.tramo} actualizado.`);
         } else {
           a.estado = 'Rechazada';
@@ -3400,13 +4493,18 @@
         renderAll();
       }
 
+      function csvEscape(valor) {
+        const texto = valor === null || valor === undefined ? '' : String(valor);
+        return '"' + texto.replace(/"/g, '""') + '"';
+      }
+
       function downloadArchiveFile(fileId) {
         const f = state.files.find(x => x.id === fileId);
         if (!f) return;
         const csvLines = ['fecha,punto,lluvia_mm,origen'].concat(
-          f.rows.map(r => `"${r.fecha}","${r.punto}",${r.mm === null ? '' : r.mm},"${r.origen}"`)
+          f.rows.map(r => [csvEscape(r.fecha), csvEscape(r.punto), r.mm === null ? '' : String(r.mm), csvEscape(r.origen)].join(','))
         );
-        const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob(['\uFEFF' + csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -3420,9 +4518,9 @@
 
       function exportObserversCsv() {
         const lines = ['alias,sector,rol,estado,ultima_lectura'].concat(
-          state.observers.map(o => `"${o.alias}","${o.sector}","${o.rol}","${o.estado}","${o.lastReading}"`)
+          state.observers.map(o => [csvEscape(o.alias), csvEscape(o.sector), csvEscape(o.rol), csvEscape(o.estado), csvEscape(o.lastReading)].join(','))
         );
-        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -3480,8 +4578,73 @@
           if (e.key === 'Escape') {
             if (ui.kioscoActive) closeKiosco();
             else if (ui.sheetType) closeSheet();
+            return;
+          }
+          if (ui.kioscoActive && e.key === 'ArrowRight') { moverKiosco(1); return; }
+          if (ui.kioscoActive && e.key === 'ArrowLeft') { moverKiosco(-1); return; }
+
+          /* El foco no se escapa de la hoja lateral. */
+          if (ui.sheetType && e.key === 'Tab') {
+            const panel = document.getElementById('sheetPanel');
+            const focos = elementosEnfocables(panel);
+            if (!panel || !focos.length) { e.preventDefault(); return; }
+            const primero = focos[0];
+            const ultimo = focos[focos.length - 1];
+            if (!panel.contains(document.activeElement)) {
+              e.preventDefault();
+              primero.focus();
+              return;
+            }
+            if (e.shiftKey && document.activeElement === primero) {
+              e.preventDefault();
+              ultimo.focus();
+              return;
+            }
+            if (!e.shiftKey && document.activeElement === ultimo) {
+              e.preventDefault();
+              primero.focus();
+              return;
+            }
+          }
+
+          /* Teclado físico en la hoja Entrar. */
+          if (ui.sheetType === 'ingreso') {
+            const activo = document.activeElement;
+            const enPin = activo && (activo.id === 'loginPinBtn' ||
+              (activo.closest && activo.closest('#loginNumpad')));
+            if (enPin) ui.loginFocusField = 'pin';
+            if (enPin && /^[0-9]$/.test(e.key)) { e.preventDefault(); pulsarLogin(e.key); return; }
+            if (enPin && e.key === 'Backspace') { e.preventDefault(); pulsarLogin('←'); return; }
+            if (enPin && e.key === 'Enter') { e.preventDefault(); attemptLogin(); return; }
+          }
+
+          /* Teclado físico en Registrar › Lectura, fuera de campos de texto. */
+          if (!ui.sheetType && !ui.kioscoActive && ui.tab === 'registrar' && ui.subtab === 'lectura') {
+            const t = e.target;
+            const enCampo = t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName);
+            if (!enCampo && !e.ctrlKey && !e.metaKey && !e.altKey) {
+              if (/^[0-9]$/.test(e.key)) { e.preventDefault(); handleRegNumpad(e.key); return; }
+              if (e.key === ',' || e.key === '.') { e.preventDefault(); handleRegNumpad(','); return; }
+              if (e.key === 'Backspace') { e.preventDefault(); handleRegNumpad('←'); return; }
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const btn = document.getElementById('btnRegNext2');
+                if (btn) btn.click();
+                return;
+              }
+            }
           }
         });
+
+        function actualizarConexion() {
+          const franja = document.getElementById('offlineBanner');
+          if (!franja) return;
+          const sinRed = (typeof navigator !== 'undefined') && navigator.onLine === false;
+          franja.classList.toggle('hidden', !sinRed);
+        }
+        window.addEventListener('online', actualizarConexion);
+        window.addEventListener('offline', actualizarConexion);
+        actualizarConexion();
 
         window.addEventListener('hashchange', parseHash);
         window.addEventListener('resize', () => {

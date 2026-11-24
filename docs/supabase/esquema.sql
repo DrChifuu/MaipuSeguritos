@@ -80,7 +80,7 @@ create unique index if not exists mv_observadores_tarjeta on mv_observadores (ta
 create table if not exists mv_lecturas (
   id                 text primary key,
   punto_id           text not null references mv_puntos(id) on delete restrict,
-  mm                 numeric(6, 1) not null check (mm >= 0 and mm <= 300),
+  mm                 numeric(6, 1) check (mm is null or (mm >= 0 and mm <= 300)),  -- null = «sin dato»
   medida_en          timestamptz not null,
   origen             text not null,
   instrumento        text,
@@ -199,6 +199,9 @@ declare
   v_obs   mv_observadores;
   v_token uuid;
 begin
+  -- No se acumulan tokens muertos: se limpian al entrar.
+  delete from mv_sesiones where expira_en <= now();
+
   select * into v_obs
   from mv_observadores
   where tarjeta_hash = mv_hash_tarjeta(trim(p_codigo))
@@ -326,6 +329,24 @@ begin
     return jsonb_build_object('ok', false, 'motivo', 'permiso');
   end if;
 
+  if p_estado is null or jsonb_typeof(p_estado) <> 'object' then
+    return jsonb_build_object('ok', false, 'motivo', 'formato');
+  end if;
+
+  -- El snapshot público no lleva sesión ni credenciales de tarjetas.
+  p_estado := p_estado - 'session' - 'loginAttempts' - 'lockoutUntil' - '_version';
+
+  if jsonb_typeof(p_estado -> 'observers') = 'array' then
+    p_estado := jsonb_set(
+      p_estado,
+      '{observers}',
+      coalesce((
+        select jsonb_agg(o - 'card' - 'pin')
+        from jsonb_array_elements(p_estado -> 'observers') as o
+      ), '[]'::jsonb)
+    );
+  end if;
+
   insert into mv_estado_snapshot (id, estado, actualizado_en)
   values (1, p_estado, now())
   on conflict (id) do update set estado = excluded.estado, actualizado_en = now();
@@ -355,6 +376,165 @@ grant execute on function mv_registrar_lectura(uuid, text, numeric, timestamptz,
 grant execute on function mv_confirmar_tramo(uuid, text, text, text, text) to anon, authenticated;
 grant execute on function mv_guardar_estado(uuid, jsonb) to anon, authenticated;
 grant execute on function mv_estado_publico() to anon, authenticated;
+
+-- ============================================================================
+-- ADMINISTRACIÓN DE TARJETAS (solo directiva)
+-- ============================================================================
+
+-- Cierra la sesión de una tarjeta.
+create or replace function mv_salir(p_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from mv_sesiones where token = p_token;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- Crea una tarjeta nueva. Solo la directiva.
+create or replace function mv_crear_observador(
+  p_token uuid,
+  p_alias text,
+  p_sector text,
+  p_sector_id text,
+  p_codigo text,
+  p_pin text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ses record;
+  v_id  text;
+begin
+  select * into v_ses from mv_sesion(p_token) limit 1;
+  if v_ses.observador_id is null or v_ses.rol <> 'directiva' then
+    return jsonb_build_object('ok', false, 'motivo', 'permiso');
+  end if;
+
+  if coalesce(trim(p_alias), '') = ''
+     or coalesce(trim(p_codigo), '') = ''
+     or coalesce(trim(p_pin), '') = '' then
+    return jsonb_build_object('ok', false, 'motivo', 'datos');
+  end if;
+
+  if exists (
+    select 1 from mv_observadores
+    where tarjeta_hash = mv_hash_tarjeta(trim(p_codigo))
+  ) then
+    return jsonb_build_object('ok', false, 'motivo', 'tarjeta-duplicada');
+  end if;
+
+  v_id := 'OBS-' || upper(substr(md5(random()::text), 1, 6));
+
+  insert into mv_observadores (
+    id, alias, sector, sector_id, rol, estado, tarjeta_hash, pin_hash
+  ) values (
+    v_id, trim(p_alias), p_sector, p_sector_id, 'observador', 'Acreditado',
+    mv_hash_tarjeta(trim(p_codigo)), crypt(p_pin, gen_salt('bf'))
+  );
+
+  return jsonb_build_object('ok', true, 'id', v_id);
+end;
+$$;
+
+-- Cambia la clave y, si viene, el código de una tarjeta. Solo la directiva.
+create or replace function mv_cambiar_pin_observador(
+  p_token uuid,
+  p_obs_id text,
+  p_nuevo_pin text,
+  p_nuevo_codigo text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ses record;
+begin
+  select * into v_ses from mv_sesion(p_token) limit 1;
+  if v_ses.observador_id is null or v_ses.rol <> 'directiva' then
+    return jsonb_build_object('ok', false, 'motivo', 'permiso');
+  end if;
+
+  if coalesce(trim(p_nuevo_pin), '') = '' then
+    return jsonb_build_object('ok', false, 'motivo', 'datos');
+  end if;
+
+  if not exists (select 1 from mv_observadores where id = p_obs_id) then
+    return jsonb_build_object('ok', false, 'motivo', 'no-existe');
+  end if;
+
+  if coalesce(trim(p_nuevo_codigo), '') <> '' then
+    if exists (
+      select 1 from mv_observadores
+      where tarjeta_hash = mv_hash_tarjeta(trim(p_nuevo_codigo))
+        and id <> p_obs_id
+    ) then
+      return jsonb_build_object('ok', false, 'motivo', 'tarjeta-duplicada');
+    end if;
+
+    update mv_observadores
+    set pin_hash = crypt(p_nuevo_pin, gen_salt('bf')),
+        tarjeta_hash = mv_hash_tarjeta(trim(p_nuevo_codigo))
+    where id = p_obs_id;
+  else
+    update mv_observadores
+    set pin_hash = crypt(p_nuevo_pin, gen_salt('bf'))
+    where id = p_obs_id;
+  end if;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+-- Suspende o reactiva una tarjeta. Solo la directiva.
+create or replace function mv_cambiar_estado_observador(
+  p_token uuid,
+  p_obs_id text,
+  p_estado text,
+  p_motivo text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ses record;
+begin
+  select * into v_ses from mv_sesion(p_token) limit 1;
+  if v_ses.observador_id is null or v_ses.rol <> 'directiva' then
+    return jsonb_build_object('ok', false, 'motivo', 'permiso');
+  end if;
+
+  if p_estado is null or p_estado not in ('Acreditado', 'Suspendido') then
+    return jsonb_build_object('ok', false, 'motivo', 'estado');
+  end if;
+
+  update mv_observadores
+  set estado = p_estado,
+      motivo_baja = case when p_estado = 'Suspendido' then p_motivo else null end
+  where id = p_obs_id;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'motivo', 'no-existe');
+  end if;
+
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+grant execute on function mv_salir(uuid) to anon, authenticated;
+grant execute on function mv_crear_observador(uuid, text, text, text, text, text) to anon, authenticated;
+grant execute on function mv_cambiar_pin_observador(uuid, text, text, text) to anon, authenticated;
+grant execute on function mv_cambiar_estado_observador(uuid, text, text, text) to anon, authenticated;
 
 -- ============================================================================
 -- DATOS INICIALES (los mismos seis puntos de la semilla)

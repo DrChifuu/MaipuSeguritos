@@ -168,6 +168,7 @@
 
     /* Inputs y selects accesibles */
     input[type="text"],
+    input[type="search"],
     input[type="date"],
     input[type="time"],
     input[type="number"],
@@ -1340,4 +1341,105 @@
         bottom: 84px;
       }
     }
-  
+
+    /* Aviso de conexión (arriba del contenido, sin tapar nada) */
+    .offline-banner {
+      flex-shrink: 0;
+      background-color: var(--ambar-bg);
+      color: var(--ambar);
+      border-bottom: 2px solid var(--ambar);
+      padding: 8px 16px;
+      font-size: var(--fs-min);
+      font-weight: 600;
+      text-align: center;
+    }
+    .offline-banner.hidden {
+      display: none;
+    }
+
+    /* Foto comprimida de una lectura o un aviso */
+    .photo-preview {
+      display: block;
+      max-width: 100%;
+      max-height: 260px;
+      margin-top: 10px;
+      border: 2px solid var(--borde);
+      border-radius: var(--radius);
+    }
+
+    /* ==========================================================================
+       FASE 3 · ESCRITORIO 1280×800 SIN SCROLL (SOLO TAMAÑO NORMAL)
+       Con html.font-large se permite desplazamiento: la letra manda.
+       ========================================================================== */
+    @media (min-width: 769px) {
+      html:not(.font-large) .topbar { height: 64px; }
+      html:not(.font-large) .tabbar { height: 56px; min-height: 56px; }
+      html:not(.font-large) .main-panel { padding: 8px 20px; }
+      html:not(.font-large) .danger-banner { padding: 6px 14px; margin-bottom: 8px; }
+      html:not(.font-large) .rain-grid { gap: 8px; margin-bottom: 8px; }
+      html:not(.font-large) .rain-card { padding: 8px 14px; gap: 2px; }
+      html:not(.font-large) .rain-number { font-size: 44px; }
+      html:not(.font-large) .rain-card-foot { padding-top: 2px; margin-top: 0; }
+      html:not(.font-large) .road-strip { padding: 6px 14px; }
+    }
+
+    /* Enlace de salto: invisible hasta que recibe foco */
+    .skip-link {
+      position: fixed;
+      top: -120px;
+      left: 16px;
+      z-index: 500;
+      background-color: var(--tinta);
+      color: #FFFFFF;
+      padding: 14px 20px;
+      border-radius: var(--radius);
+      font-family: var(--font-sans);
+      font-size: var(--fs-body);
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+    .skip-link:focus {
+      top: 12px;
+      outline: 3px solid var(--agua);
+      outline-offset: 2px;
+    }
+
+    /* Controles deshabilitados: se entienden como tales */
+    button:disabled,
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+      opacity: 0.52;
+      cursor: not-allowed;
+      background-color: var(--papel);
+      color: var(--tinta-2);
+      border-color: var(--borde);
+    }
+
+    /* Cifra del kiosco: se adapta a pantallas menores sin perder tamaño */
+    .kiosco-num {
+      font-size: clamp(56px, 7.5vw, 112px);
+    }
+
+    /* Badge compacto de pendientes en la barra inferior móvil */
+    .bottom-btn {
+      position: relative;
+    }
+    .bottom-badge {
+      position: absolute;
+      top: 4px;
+      right: 50%;
+      transform: translateX(26px);
+      min-width: 24px;
+      height: 24px;
+      padding: 0 4px;
+      border-radius: 999px;
+      background-color: var(--rojo);
+      color: #FFFFFF;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 24px;
+      text-align: center;
+    }
+
