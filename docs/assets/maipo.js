@@ -184,13 +184,112 @@
       }
 
       function formatRelativeTime(minutesAgo, customText) {
-        if (customText) return customText;
-        if (minutesAgo === null || minutesAgo === undefined) return 'sin registro';
+        if (minutesAgo === null || minutesAgo === undefined) return customText || 'sin registro';
         if (minutesAgo <= 0) return 'ahora';
         if (minutesAgo === 1) return 'hace 1 min';
         if (minutesAgo < 60) return `hace ${minutesAgo} min`;
-        const h = Math.floor(minutesAgo / 60);
-        return h === 1 ? 'hace 1 hora' : `hace ${h} horas`;
+        const horas = Math.floor(minutesAgo / 60);
+        if (horas < 24) return horas === 1 ? 'hace 1 hora' : `hace ${horas} horas`;
+        const dias = Math.floor(horas / 24);
+        return dias === 1 ? 'hace 1 día' : `hace ${dias} días`;
+      }
+
+      /* Minutos completos desde un instante; null si no hay dato. */
+      function minutosDesde(tsMs) {
+        if (!Number.isFinite(tsMs)) return null;
+        return Math.max(0, Math.floor((Date.now() - tsMs) / 60000));
+      }
+
+      /* Minutos de la última medición de una estación. */
+      function minutosEstacion(estacion) {
+        if (!estacion) return null;
+        if (Number.isFinite(estacion.measuredAt)) return minutosDesde(estacion.measuredAt);
+        return Number.isFinite(estacion.minutesAgo) ? estacion.minutesAgo : null;
+      }
+
+      /* Minutos desde el último refresco del camino. */
+      function minutosCaminoRefresco() {
+        if (Number.isFinite(state.roadRefreshedAt)) return minutosDesde(state.roadRefreshedAt);
+        return Number.isFinite(state.roadMinutesSinceRefresh) ? state.roadMinutesSinceRefresh : 0;
+      }
+
+      function formatTiempoDesdeTs(tsMs, fallbackText) {
+        if (!Number.isFinite(tsMs)) return fallbackText || 'sin registro';
+        return formatRelativeTime(minutosDesde(tsMs));
+      }
+
+      function formatActualizadoTopbar() {
+        if (!Number.isFinite(state.updatedAt)) {
+          return 'Actualizado ' + (state.updatedLabel || 'sin registro');
+        }
+        const minutos = minutosDesde(state.updatedAt);
+        if (minutos <= 0) return 'Actualizado ahora';
+        if (minutos === 1) return 'Actualizado hace 1 min';
+        if (minutos < 60) return `Actualizado hace ${minutos} min`;
+        const horas = Math.floor(minutos / 60);
+        const p = partesFechaChile(new Date(state.updatedAt));
+        return `Actualizado hace ${horas} h · ${p.hora}:${p.minuto}`;
+      }
+
+      function formatCountdown(msRestantes) {
+        const total = Math.max(0, Math.ceil(msRestantes / 1000));
+        const minutos = Math.floor(total / 60);
+        const segundos = total % 60;
+        return String(minutos).padStart(2, '0') + ':' + String(segundos).padStart(2, '0');
+      }
+
+      function textoLive(tsMs, kind, fallbackText) {
+        if (!Number.isFinite(tsMs)) return fallbackText || 'sin registro';
+        if (kind === 'actualizado') return formatActualizadoTopbar();
+        return formatTiempoDesdeTs(tsMs, fallbackText);
+      }
+
+      function liveTimeSpan(tsMs, kind, fallbackText) {
+        const texto = textoLive(tsMs, kind, fallbackText);
+        if (!Number.isFinite(tsMs)) return escapeHtml(texto);
+        return `<span data-live-ts="${tsMs}" data-live-kind="${escapeHtml(kind || 'relativo')}" data-live-fallback="${escapeHtml(fallbackText || '')}">${escapeHtml(texto)}</span>`;
+      }
+
+      /* Rellena los tiempos que un respaldo viejo no traía. */
+      function migrarTiemposEstado(st) {
+        if (!st || typeof st !== 'object') return st;
+        const ahora = Date.now();
+
+        if (!Number.isFinite(st.updatedAt)) st.updatedAt = ahora;
+        if (!Number.isFinite(st.roadRefreshedAt)) {
+          const minutos = Number.isFinite(st.roadMinutesSinceRefresh) ? st.roadMinutesSinceRefresh : 2;
+          st.roadRefreshedAt = ahora - minutos * 60000;
+        }
+
+        (st.stations || []).forEach(s => {
+          if (!Number.isFinite(s.measuredAt)) {
+            s.measuredAt = Number.isFinite(s.minutesAgo) ? ahora - s.minutesAgo * 60000 : null;
+          }
+          if (!Number.isFinite(s.lastObserverAt)) {
+            s.lastObserverAt = Number.isFinite(s.measuredAt) ? s.measuredAt : null;
+          }
+        });
+
+        (st.roads || []).forEach(r => {
+          if (!Number.isFinite(r.updatedAt)) r.updatedAt = st.roadRefreshedAt;
+        });
+
+        (st.roadChanges || []).forEach(c => {
+          if (!Number.isFinite(c.createdAt)) c.createdAt = st.roadRefreshedAt;
+        });
+
+        (st.citizenReports || []).forEach(a => {
+          if (!Number.isFinite(a.createdAt)) a.createdAt = st.updatedAt;
+        });
+
+        (st.observers || []).forEach(o => {
+          if (Number.isFinite(o.lastReadingAt)) return;
+          const suyas = (st.readings || []).filter(r => r.observador_id === o.id && r.timestamp);
+          const ts = suyas.length ? new Date(suyas[0].timestamp).getTime() : NaN;
+          o.lastReadingAt = Number.isFinite(ts) ? ts : null;
+        });
+
+        return st;
       }
 
       /* ------------------------------------------------------------------------
@@ -294,8 +393,8 @@
 
       function loadState() {
         const guardado = ALMACEN ? ALMACEN.cargar() : null;
-        if (guardado) return guardado;
-        const inicial = buildInitialState();
+        if (guardado) return migrarTiemposEstado(guardado);
+        const inicial = migrarTiemposEstado(buildInitialState());
         /* La etiqueta de actualización no se inventa al cargar: se mueve cuando
            hay una acción real (validar, ingresar, confirmar un tramo). */
         try { if (ALMACEN) ALMACEN.guardar(inicial); } catch (e) { /* sin cuota */ }
@@ -377,6 +476,9 @@
         confirmTitulo: '',
         confirmTexto: '',
         confirmAccion: null,
+        /* Reloj en vivo */
+        firmaTiempos: '',
+        kioscoMinuto: null,
         /* Kiosco */
         kioscoActive: false,
         kioscoFocusIdx: 0,
@@ -393,22 +495,27 @@
         return state.session.rol === 'directiva' ? 'directiva' : 'observador';
       }
 
-      function checkSessionTimeout() {
-        if (!state.session) return;
+      function checkSessionTimeout(soloLectura) {
+        if (!state.session) return false;
         const now = Date.now();
         const maxSessionMs = 8 * 60 * 60 * 1000;
         const maxIdleMs = 30 * 60 * 1000;
-        if ((now - state.session.loginAt > maxSessionMs) || (now - state.session.lastActivity > maxIdleMs)) {
+        const vencida = (now - state.session.loginAt > maxSessionMs) ||
+          (now - state.session.lastActivity > maxIdleMs);
+        if (vencida) {
           state.session = null;
           saveState();
           showToast('Tu sesión se cerró por tiempo de espera.');
           if (ui.tab === 'registrar' || ui.tab === 'directiva') {
             navigate('ahora', 'lluvia');
           }
-        } else {
+          return true;
+        }
+        if (!soloLectura) {
           state.session.lastActivity = now;
           saveState();
         }
+        return false;
       }
 
       function getTabsForRole(role) {
@@ -652,7 +759,7 @@
       function getWorstRainState() {
         let worst = 'verde';
         state.stations.forEach(s => {
-          const st = computeRainState(s.rainfall_mm, s.minutesAgo, s.hasSensor);
+          const st = computeRainState(s.rainfall_mm, minutosEstacion(s), s.hasSensor);
           if (severityRank(st) < severityRank(worst)) worst = st;
         });
         return worst;
@@ -664,7 +771,11 @@
         const pendingTotal = getPendingQueueCount();
 
         /* Topbar actualizado + estado móvil */
-        document.getElementById('topbarUpdated').textContent = `Actualizado ${state.updatedLabel}`;
+        const topbar = document.getElementById('topbarUpdated');
+        topbar.setAttribute('data-live-ts', Number.isFinite(state.updatedAt) ? state.updatedAt : '');
+        topbar.setAttribute('data-live-kind', 'actualizado');
+        topbar.setAttribute('data-live-fallback', '');
+        topbar.textContent = formatActualizadoTopbar();
         const tagDemo = document.getElementById('demoTag');
         if (tagDemo) tagDemo.textContent = (ALMACEN && ALMACEN.configurado) ? 'Datos del servidor' : 'Datos de ejemplo';
         const worstRain = getWorstRainState();
@@ -798,7 +909,7 @@
         const isMobile = window.innerWidth <= 768;
         const stationsComputed = state.stations.map(s => ({
           ...s,
-          state: computeRainState(s.rainfall_mm, s.minutesAgo, s.hasSensor)
+          state: computeRainState(s.rainfall_mm, minutosEstacion(s), s.hasSensor)
         }));
 
         /* En móvil ordenar por gravedad; en escritorio mantener orden claro con los más críticos arriba */
@@ -820,7 +931,7 @@
         const cardsHtml = ordered.map(s => {
           const mmText = formatMm(s.rainfall_mm);
           const unitHtml = s.rainfall_mm !== null ? `<span class="rain-unit">mm</span>` : '';
-          const timeStr = formatRelativeTime(s.minutesAgo, s.timeText);
+          const timeStr = liveTimeSpan(s.measuredAt, 'estacion', s.timeText);
           const quebradaStr = s.quebrada ? ` · ${escapeHtml(s.quebrada)}` : '';
           const roadLine = getRoadLineForStation(s.id);
 
@@ -834,7 +945,7 @@
                 <div>
                   <span class="rain-number">${mmText}</span>${unitHtml}
                 </div>
-                <span class="rain-meta">${escapeHtml(timeStr)}</span>
+                <span class="rain-meta">${timeStr}</span>
               </div>
               ${quebradaStr ? `<p class="rain-meta">${escapeHtml(s.quebrada)}</p>` : ''}
               <div class="rain-card-foot">
@@ -878,7 +989,7 @@
 
       function renderZoneDetail() {
         const s = state.stations.find(x => x.id === ui.zoneId) || state.stations[0];
-        const st = computeRainState(s.rainfall_mm, s.minutesAgo, s.hasSensor);
+        const st = computeRainState(s.rainfall_mm, minutosEstacion(s), s.hasSensor);
         const road = state.roads.find(r => r.id === s.id);
 
         let body = '';
@@ -918,7 +1029,7 @@
             <div class="card-box">
               <div class="flex-between mb-12">
                 <div>
-                  <div class="muted">Lluvia en la última hora · ${escapeHtml(formatRelativeTime(s.minutesAgo, s.timeText))}</div>
+                  <div class="muted">Lluvia en la última hora · ${liveTimeSpan(s.measuredAt, 'estacion', s.timeText)}</div>
                   <div class="rain-number">${formatMm(s.rainfall_mm)}${s.rainfall_mm !== null ? '<span class="rain-unit">mm</span>' : ''}</div>
                 </div>
                 <div>
@@ -946,12 +1057,12 @@
               <div class="card-box">
                 <h3 class="section-title mb-8">Equipo automático</h3>
                 <p style="margin:0 0 8px 0;"><strong>${escapeHtml(s.sensorStatus)}</strong></p>
-                <p class="muted" style="margin:0;">Estación: ${escapeHtml(s.station_id)} · Última actualización: ${escapeHtml(formatRelativeTime(s.minutesAgo, s.timeText))}</p>
+                <p class="muted" style="margin:0;">Estación: ${escapeHtml(s.station_id)} · Última actualización: ${liveTimeSpan(s.measuredAt, 'estacion', s.timeText)}</p>
               </div>
               <div class="card-box">
                 <h3 class="section-title mb-8">Observadores del sector</h3>
                 <p style="margin:0 0 8px 0;"><strong>${s.observerCount24h} lecturas en las últimas 24 horas</strong></p>
-                <p class="muted" style="margin:0;">Última medición: ${escapeHtml(s.lastObserverHour)} · Solo lecturas validadas mueven el semáforo.</p>
+                <p class="muted" style="margin:0;">Última medición: ${liveTimeSpan(s.lastObserverAt, 'estacion', s.lastObserverHour)} · Solo lecturas validadas mueven el semáforo.</p>
               </div>
             </div>
             <div class="card-box">
@@ -962,7 +1073,7 @@
                     <div class="item-row">
                       <div class="row-main">
                         <div class="row-title">${escapeHtml(r.observador_alias)} · ${formatMm(r.rainfall_mm)}${r.rainfall_mm !== null ? ' mm' : ''}</div>
-                        <div class="row-sub">${escapeHtml(r.instrumento)} · ${escapeHtml(r.timeLabel)}</div>
+                        <div class="row-sub">${escapeHtml(r.instrumento)} · ${liveTimeSpan(new Date(r.timestamp).getTime(), 'lectura', r.timeLabel)}</div>
                       </div>
                       <span class="tag ${tagClassForValidation(r.estado_validacion)}">${escapeHtml(r.estado_validacion)}</span>
                     </div>
@@ -978,7 +1089,7 @@
                 ${statePill(road ? road.state : 'sindato', 'road')}
               </div>
               <p style="margin:0 0 8px 0;"><strong>${escapeHtml(road ? road.note : 'Sin información disponible.')}</strong></p>
-              <p class="muted mb-12">Informó: ${escapeHtml(road ? road.source : 'Sin fuente')} · ${escapeHtml(road ? road.timeLabel : 'sin hora')}</p>
+              <p class="muted mb-12">Informó: ${escapeHtml(road ? road.source : 'Sin fuente')} · ${road ? liveTimeSpan(road.updatedAt, 'camino', road.timeLabel) : 'sin hora'}</p>
               <div class="flex-row">
                 <button type="button" class="btn-primary" data-open-road-sheet="${s.id}">Ver el tramo</button>
                 <button type="button" id="btnZoneToCamino">Ver todos los tramos</button>
@@ -1048,7 +1159,7 @@
                     <span>${escapeHtml(r.point_name)}</span>
                     <span style="font-family:var(--font-serif); font-size:26px;">${formatMm(r.rainfall_mm)}${r.rainfall_mm !== null ? ' mm' : ''}</span>
                   </div>
-                  <div class="row-sub">${escapeHtml(r.observador_alias)} · ${escapeHtml(r.instrumento)} · ${escapeHtml(r.timeLabel)}</div>
+                  <div class="row-sub">${escapeHtml(r.observador_alias)} · ${escapeHtml(r.instrumento)} · ${liveTimeSpan(new Date(r.timestamp).getTime(), 'lectura', r.timeLabel)}</div>
                 </div>
                 <span class="tag ${tagClassForValidation(r.estado_validacion)}">${escapeHtml(r.estado_validacion)}</span>
               </div>
@@ -1067,9 +1178,10 @@
           return diff !== 0 ? diff : a.order - b.order;
         });
 
-        const staleBanner = state.roadMinutesSinceRefresh > 30
+        const minutosCamino = minutosCaminoRefresco();
+        const staleBanner = minutosCamino > THRESHOLDS.staleMinutes
           ? `<div class="amber-banner" role="alert">
-               <span>Información de hace ${state.roadMinutesSinceRefresh} minutos. Conviene actualizar.</span>
+               <span>Información de ${liveTimeSpan(state.roadRefreshedAt, 'camino', 'hace ' + minutosCamino + ' min')}. Conviene actualizar.</span>
                <button type="button" id="btnRefreshRoadBanner">${ICONS.refresh}<span>Actualizar</span></button>
              </div>`
           : '';
@@ -1078,7 +1190,7 @@
           <div class="flex-between mb-12">
             <div class="flex-row">
               <h2 class="section-title">Estado de la ruta G-25</h2>
-              <span class="muted">Actualizado hace ${state.roadMinutesSinceRefresh} min</span>
+              <span class="muted">${liveTimeSpan(state.roadRefreshedAt, 'camino', 'hace ' + minutosCamino + ' min')}</span>
             </div>
             <div class="flex-row">
               <button type="button" id="btnRefreshRoad">${ICONS.refresh}<span>Actualizar</span></button>
@@ -1095,7 +1207,7 @@
                     <span>${escapeHtml(r.name)}</span>
                     ${r.pendingReports > 0 ? `<span class="tag tag-revision">${r.pendingReports} ${r.pendingReports === 1 ? 'vecino informó' : 'vecinos informaron'}</span>` : ''}
                   </div>
-                  <div class="row-sub">${escapeHtml(r.source)} · ${escapeHtml(r.timeLabel)} — ${escapeHtml(r.note)}</div>
+                  <div class="row-sub">${escapeHtml(r.source)} · ${liveTimeSpan(r.updatedAt, 'camino', r.timeLabel)} — ${escapeHtml(r.note)}</div>
                 </div>
                 <div class="row-actions">
                   <button type="button" data-open-road-sheet="${r.id}" aria-label="Ver detalle del tramo ${escapeHtml(r.name)}">Ver</button>
@@ -1197,7 +1309,7 @@
               <div class="item-row">
                 <div class="row-main">
                   <div class="row-title">
-                    <span>${escapeHtml(c.hora)}</span>
+                    <span>${liveTimeSpan(c.createdAt, 'camino', c.hora)}</span>
                     <span>·</span>
                     <span>${escapeHtml(c.tramo)}</span>
                     ${statePill(c.state, 'road')}
@@ -1651,7 +1763,7 @@
                 </div>
                 <div style="text-align:right;">
                   <div class="rain-number" style="font-size:64px;">${formatMm(r.rainfall_mm)}${r.rainfall_mm !== null ? '<span class="rain-unit">mm</span>' : ''}</div>
-                  <div class="muted">${escapeHtml(r.timeLabel)}</div>
+                  <div class="muted">${liveTimeSpan(new Date(r.timestamp).getTime(), 'lectura', r.timeLabel)}</div>
                 </div>
               </div>
 
@@ -1665,7 +1777,7 @@
                 <div class="info-banner" style="margin:0;">
                   <div><strong>Para comparar (lectura anterior):</strong></div>
                   <div style="font-size:24px; font-weight:700;">${prev ? `${formatMm(prev.rainfall_mm)} mm` : 'Sin dato previo'}</div>
-                  <div class="muted">${prev ? `${escapeHtml(prev.timeLabel)} · ${escapeHtml(prev.observador_alias)}` : 'Primera lectura del punto'}</div>
+                  <div class="muted">${prev ? `${liveTimeSpan(new Date(prev.timestamp).getTime(), 'lectura', prev.timeLabel)} · ${escapeHtml(prev.observador_alias)}` : 'Primera lectura del punto'}</div>
                 </div>
               </div>
 
@@ -1719,12 +1831,12 @@
               <div class="info-banner" style="margin:0;">
                 <div><strong>Qué informó el vecino:</strong> ${escapeHtml(a.tipo)}</div>
                 <div><strong>Nota:</strong> ${escapeHtml(a.nota || 'Sin nota adicional')}</div>
-                <div class="muted">${escapeHtml(a.hora)}</div>
+                <div class="muted">${liveTimeSpan(a.createdAt, 'camino', a.hora)}</div>
               </div>
               <div class="info-banner" style="margin:0;">
                 <div><strong>Estado público actual del tramo:</strong></div>
                 <div class="mt-8">${statePill(roadNow ? roadNow.state : 'sindato', 'road')}</div>
-                <div class="muted mt-8">${escapeHtml(roadNow ? `${roadNow.source} · ${roadNow.timeLabel}` : '')}</div>
+                <div class="muted mt-8">${roadNow ? `${escapeHtml(roadNow.source)} · ${liveTimeSpan(roadNow.updatedAt, 'camino', roadNow.timeLabel)}` : ''}</div>
               </div>
             </div>
 
@@ -1778,7 +1890,7 @@
                     <td>${escapeHtml(o.sector)}</td>
                     <td>${o.rol === 'directiva' ? 'Directiva' : 'Observador'}</td>
                     <td><span class="tag ${o.estado === 'Acreditado' ? 'tag-validada' : 'tag-rechazada'}">${escapeHtml(o.estado)}</span></td>
-                    <td>${escapeHtml(o.lastReading)}</td>
+                    <td>${liveTimeSpan(o.lastReadingAt, 'lectura', o.lastReading)}</td>
                     <td>
                       <div class="flex-row">
                         <button type="button" class="btn-sm-pad" data-view-obs="${o.id}">Ver</button>
@@ -1877,7 +1989,7 @@
                 <tbody>
                   ${oficiales.map(r => `
                     <tr>
-                      <td>${escapeHtml(r.timeLabel)}</td>
+                      <td>${liveTimeSpan(new Date(r.timestamp).getTime(), 'lectura', r.timeLabel)}</td>
                       <td><strong>${escapeHtml(r.point_name)}</strong></td>
                       <td>${formatMm(r.rainfall_mm)}</td>
                       <td>${escapeHtml(r.instrumento || r.origen || 'Oficial')}</td>
@@ -1955,7 +2067,7 @@
                     <td><strong>${escapeHtml(s.name)}</strong></td>
                     <td>${s.quebrada ? escapeHtml(s.quebrada) : '—'}</td>
                     <td>${s.hasSensor ? 'Sí' : 'No'}</td>
-                    <td>${s.rainfall_mm === null ? 'Sin dato' : formatMm(s.rainfall_mm) + ' mm · ' + escapeHtml(formatRelativeTime(s.minutesAgo, s.timeText))}</td>
+                    <td>${s.rainfall_mm === null ? 'Sin dato' : formatMm(s.rainfall_mm) + ' mm · ' + liveTimeSpan(s.measuredAt, 'estacion', s.timeText)}</td>
                     <td>
                       <div class="flex-row">
                         <button type="button" class="btn-sm-pad" data-edit-point="${s.id}">Editar</button>
@@ -2396,7 +2508,7 @@
                   <div class="item-row">
                     <div class="row-main">
                       <div class="row-title">${escapeHtml(d.nombre)}</div>
-                      <div class="row-sub">${d.validRows.length} filas · guardado ${escapeHtml(formatRelativeTime(Math.max(0, Math.round((Date.now() - d.guardadoEn) / 60000))))}</div>
+                      <div class="row-sub">${d.validRows.length} filas · guardado ${liveTimeSpan(d.guardadoEn, 'relativo', 'hace un momento')}</div>
                     </div>
                     <div class="flex-row">
                       <button type="button" data-draft-resume="${d.id}">Retomar</button>
@@ -2629,12 +2741,11 @@
           titleEl.textContent = 'Entrar';
           const now = Date.now();
           const locked = state.lockoutUntil && now < state.lockoutUntil;
-          const remainingMin = locked ? Math.ceil((state.lockoutUntil - now) / 60000) : 0;
 
           if (locked) {
             bodyEl.innerHTML = `
               <div class="danger-banner">
-                <span>Espera ${remainingMin} ${remainingMin === 1 ? 'minuto' : 'minutos'} antes de volver a intentar.</span>
+                <span>Espera <strong id="lockoutCountdown">${formatCountdown(state.lockoutUntil - now)}</strong> para volver a intentar.</span>
               </div>
               <button type="button" class="btn-full mt-12" id="btnSheetAvisar">Avisar sin registrarme</button>
             `;
@@ -2689,7 +2800,7 @@
                 ? `<p class="muted">Sin lecturas recientes en esta sesión.</p>`
                 : myReadings.map(r => `
                     <div class="item-row">
-                      <div><strong>${escapeHtml(r.point_name)}</strong> · ${formatMm(r.rainfall_mm)} mm<div class="row-sub">${escapeHtml(r.timeLabel)}</div></div>
+                      <div><strong>${escapeHtml(r.point_name)}</strong> · ${formatMm(r.rainfall_mm)} mm<div class="row-sub">${liveTimeSpan(new Date(r.timestamp).getTime(), 'lectura', r.timeLabel)}</div></div>
                       <span class="tag ${tagClassForValidation(r.estado_validacion)}">${escapeHtml(r.estado_validacion)}</span>
                     </div>
                   `).join('')
@@ -2748,7 +2859,7 @@
             <div class="card-box">
               <div class="flex-between mb-8">
                 ${statePill(r.state, 'road')}
-                <span class="muted">${escapeHtml(r.timeLabel)}</span>
+                <span class="muted">${liveTimeSpan(r.updatedAt, 'camino', r.timeLabel)}</span>
               </div>
               <p style="margin:0 0 8px 0;"><strong>${escapeHtml(r.note)}</strong></p>
               <p class="muted" style="margin:0;">Fuente: ${escapeHtml(r.source)}</p>
@@ -2801,7 +2912,7 @@
               <p><strong>Rol:</strong> ${o.rol === 'directiva' ? 'Directiva' : 'Observador'}</p>
               <p><strong>Estado:</strong> ${escapeHtml(o.estado)}</p>
               <p><strong>Tarjeta terminada en:</strong> ${escapeHtml(ultimosDos(o))}</p>
-              <p><strong>Última lectura:</strong> ${escapeHtml(o.lastReading)}</p>
+              <p><strong>Última lectura:</strong> ${liveTimeSpan(o.lastReadingAt, 'lectura', o.lastReading)}</p>
               ${o.motivoBaja ? `<p><strong>Motivo de suspensión:</strong> ${escapeHtml(o.motivoBaja)}</p>` : ''}
             </div>
             <p class="muted">Suspender a un observador no borra sus lecturas históricas.</p>
@@ -2963,8 +3074,8 @@
          ------------------------------------------------------------------------ */
       function estacionesKiosco() {
         return state.stations.slice().sort((a, b) => {
-          const ra = severityRank(computeRainState(a.rainfall_mm, a.minutesAgo, a.hasSensor));
-          const rb = severityRank(computeRainState(b.rainfall_mm, b.minutesAgo, b.hasSensor));
+          const ra = severityRank(computeRainState(a.rainfall_mm, minutosEstacion(a), a.hasSensor));
+          const rb = severityRank(computeRainState(b.rainfall_mm, minutosEstacion(b), b.hasSensor));
           if (ra !== rb) return ra - rb;
           return String(a.name).localeCompare(String(b.name), 'es');
         });
@@ -2988,6 +3099,7 @@
         ui.kioscoActive = true;
         ui.kioscoTapCount = 0;
         ui.kioscoPage = 0;
+        ui.kioscoMinuto = new Date().getMinutes();
         document.getElementById('kioscoOverlay').classList.remove('hidden');
         renderKiosco();
         if (ui.kioscoTimer) clearInterval(ui.kioscoTimer);
@@ -3019,7 +3131,11 @@
         const desde = ui.kioscoPage * 3;
         const points = ordenadas.slice(desde, desde + 3);
 
-        document.getElementById('kioscoTopInfo').textContent = `Actualizado ${state.updatedLabel}`;
+        const kioscoInfo = document.getElementById('kioscoTopInfo');
+        kioscoInfo.setAttribute('data-live-ts', Number.isFinite(state.updatedAt) ? state.updatedAt : '');
+        kioscoInfo.setAttribute('data-live-kind', 'actualizado');
+        kioscoInfo.setAttribute('data-live-fallback', '');
+        kioscoInfo.textContent = formatActualizadoTopbar();
         document.getElementById('kioscoClock').textContent = fechaLargaChile() + ' · Sede Comunitaria';
 
         const modo = document.getElementById('kioscoFootMode');
@@ -3030,7 +3146,7 @@
         }
 
         document.getElementById('kioscoGrid').innerHTML = points.map(p => {
-          const st = computeRainState(p.rainfall_mm, p.minutesAgo, p.hasSensor);
+          const st = computeRainState(p.rainfall_mm, minutosEstacion(p), p.hasSensor);
           const roadLine = getRoadLineForStation(p.id);
           return `
             <article class="kiosco-card k-${st}">
@@ -3045,7 +3161,7 @@
                 ${formatMm(p.rainfall_mm)}${p.rainfall_mm !== null ? '<span style="font-size:36px; margin-left:8px;">mm</span>' : ''}
               </div>
               <div>
-                <div style="font-size:24px; color:var(--pantalla-suave);">${escapeHtml(formatRelativeTime(p.minutesAgo, p.timeText))}</div>
+                <div style="font-size:24px; color:var(--pantalla-suave);">${liveTimeSpan(p.measuredAt, 'estacion', p.timeText)}</div>
                 <div style="font-size:22px; color:#FFFFFF; margin-top:8px; font-weight:600;">${escapeHtml(roadLine)}</div>
               </div>
             </article>
@@ -3144,6 +3260,9 @@
         });
         const refreshRoad = () => {
           state.roadMinutesSinceRefresh = 0;
+          state.roadRefreshedAt = Date.now();
+          state.updatedAt = Date.now();
+          state.updatedLabel = 'hoy a las ' + horaLocalHHMM();
           saveState();
           showToast('Estado del camino actualizado.');
           renderAll();
@@ -3199,6 +3318,7 @@
               nota: ui.informNote.trim(),
               foto: ui.informPhoto || null,
               hora: 'ahora',
+              createdAt: Date.now(),
               estado: 'En revisión',
               source: 'Vecino'
             });
@@ -3758,6 +3878,7 @@
                 nota: ui.avisarNota.trim(),
                 foto: ui.avisarPhoto || null,
                 hora: 'ahora',
+                createdAt: Date.now(),
                 estado: 'En revisión',
                 source: 'Vecino'
               });
@@ -3777,7 +3898,9 @@
               if (r && state.session) {
                 r.source = state.session.alias;
                 r.timeLabel = 'ahora';
-                r.todayLog.unshift({ hora: 'Ahora', state: r.state, source: state.session.alias, note: 'Estado confirmado en terreno.' });
+                r.updatedAt = Date.now();
+                r.todayLog.unshift({ hora: 'Ahora', createdAt: Date.now(), state: r.state, source: state.session.alias, note: 'Estado confirmado en terreno.' });
+                state.updatedAt = Date.now();
                 state.updatedLabel = 'hoy a las ' + horaLocalHHMM();
                 saveState();
                 showToast(`Tramo ${r.name} confirmado.`);
@@ -4110,7 +4233,8 @@
           foto: null,
           confianza: 'alta',
           oficial: true,
-          nota: nota || null
+          nota: nota || null,
+          creadoEn: Date.now()
         };
 
         state.readings.unshift(lectura);
@@ -4199,7 +4323,10 @@
             quebrada: quebrada || null,
             rainfall_mm: null,
             minutesAgo: null,
+            measuredAt: null,
+            lastObserverAt: null,
             timeText: 'sin lecturas todavía',
+            createdAt: Date.now(),
             hasSensor: sensor,
             sensorStatus: sensorEstado,
             observerCount24h: 0,
@@ -4219,6 +4346,8 @@
             state: 'sindato',
             source: 'Sin información',
             timeLabel: 'sin reportes',
+            updatedAt: null,
+            createdAt: Date.now(),
             note: '',
             pendingReports: 0,
             todayLog: []
@@ -4270,7 +4399,7 @@
             showToast('El archivo no parece un respaldo de Maipo Vigía.');
             return;
           }
-          state = obj;
+          state = migrarTiemposEstado(obj);
           saveState();
           closeSheet();
           renderAll();
@@ -4358,12 +4487,16 @@
           verificado_en: null,
           corrige_a: null,
           foto: ui.regPhoto || null,
-          confianza: 'media'
+          confianza: 'media',
+          creadoEn: Date.now()
         };
 
         state.readings.unshift(newReading);
         const obs = state.observers.find(o => o.id === s.observerId);
-        if (obs) obs.lastReading = 'ahora';
+        if (obs) {
+          obs.lastReading = 'ahora';
+          obs.lastReadingAt = new Date(newReading.timestamp).getTime();
+        }
         saveState();
         ui.regSubmittedFolio = folio;
 
@@ -4390,13 +4523,17 @@
         if (!q[0] || q[0].kind !== 'lluvia') return;
         const r = q[0].item;
         const nowIso = new Date().toISOString();
+        const tsLectura = new Date(r.timestamp).getTime();
+        const minutosLectura = Number.isFinite(tsLectura)
+          ? Math.max(0, Math.round((Date.now() - tsLectura) / 60000))
+          : 0;
 
         if (action === 'Validada') {
           r.verified = true;
           r.estado_validacion = 'Validada';
           r.verificado_por = state.session ? state.session.alias : 'Directiva';
           r.verificado_en = nowIso;
-          applyReadingToStation(r.station_id, r.rainfall_mm, r.estado_lectura);
+          applyReadingToStation(r.station_id, r.rainfall_mm, r.estado_lectura, { minutesAgo: minutosLectura });
           showToast(`Lectura de ${r.point_name} validada. Semáforo público actualizado.`);
         } else if (action === 'Corregida') {
           /* Inmutabilidad: marca la original como sustituida y crea una fila nueva con corrige_a */
@@ -4412,10 +4549,11 @@
             estado_validacion: 'Corregida',
             verificado_por: state.session ? state.session.alias : 'Directiva',
             verificado_en: nowIso,
+            creadoEn: Date.now(),
             corrige_a: r.id
           };
           state.readings.unshift(corr);
-          applyReadingToStation(corr.station_id, corr.rainfall_mm, 'medida');
+          applyReadingToStation(corr.station_id, corr.rainfall_mm, 'medida', { minutesAgo: minutosLectura });
           showToast(`Lectura corregida a ${formatMm(correctedMm)} mm y publicada.`);
         } else {
           r.verified = false;
@@ -4436,14 +4574,17 @@
         const st = state.stations.find(x => x.id === stationId);
         if (!st) return;
         const opciones = Object.assign({ minutesAgo: 0, countAsObserver: true }, opts || {});
+        const ahora = Date.now();
 
         if (estadoLectura === 'sin_dato' || mmVal === null) {
           st.rainfall_mm = null;
           st.minutesAgo = null;
+          st.measuredAt = null;
           st.timeText = 'sin lectura posible';
         } else {
           st.rainfall_mm = mmVal;
           st.minutesAgo = opciones.minutesAgo;
+          st.measuredAt = ahora - opciones.minutesAgo * 60000;
           st.timeText = null;
           /* La serie de 24 h solo se toca si la lectura es de la última hora. */
           if (opciones.minutesAgo <= 60 && Array.isArray(st.hourly24h) && st.hourly24h.length) {
@@ -4453,8 +4594,10 @@
 
         if (opciones.countAsObserver !== false) {
           st.observerCount24h = (st.observerCount24h || 0) + 1;
+          st.lastObserverAt = ahora;
         }
         st.lastObserverHour = opciones.minutesAgo <= 0 ? 'ahora' : formatRelativeTime(opciones.minutesAgo);
+        state.updatedAt = ahora;
         state.updatedLabel = 'hoy a las ' + horaLocalHHMM();
       }
 
@@ -4470,17 +4613,20 @@
             road.state = a.suggested_state;
             road.source = 'Vecino (confirmado por Directiva)';
             road.timeLabel = 'ahora';
+            road.updatedAt = Date.now();
             road.note = a.nota ? `${a.tipo}: ${a.nota}` : a.tipo;
             road.pendingReports = Math.max(0, (road.pendingReports || 1) - 1);
-            road.todayLog.unshift({ hora: 'Ahora', state: road.state, source: 'Directiva', note: road.note });
+            road.todayLog.unshift({ hora: 'Ahora', createdAt: Date.now(), state: road.state, source: 'Directiva', note: road.note });
             state.roadChanges.unshift({
               hora: 'ahora',
+              createdAt: Date.now(),
               tramo: road.name,
               state: road.state,
               informedBy: 'Vecino',
               confirmedBy: 'Directiva'
             });
           }
+          state.updatedAt = Date.now();
           state.updatedLabel = 'hoy a las ' + horaLocalHHMM();
           showToast(`Aviso validado. Tramo ${a.tramo} actualizado.`);
         } else {
@@ -4535,6 +4681,90 @@
       /* ------------------------------------------------------------------------
          20. INICIALIZACIÓN GLOBAL Y EVENTOS PERSISTENTES
          ------------------------------------------------------------------------ */
+      let ultimoTick15 = 0;
+
+      /* Actualiza solo el texto de los tiempos: no re-renderiza ni mueve el foco. */
+      function actualizarTiemposEnDOM() {
+        document.querySelectorAll('[data-live-ts]').forEach(el => {
+          const ts = Number(el.getAttribute('data-live-ts'));
+          const kind = el.getAttribute('data-live-kind') || 'relativo';
+          const fallback = el.getAttribute('data-live-fallback') || '';
+          const texto = kind === 'actualizado'
+            ? formatActualizadoTopbar()
+            : formatTiempoDesdeTs(ts, fallback);
+          if (el.textContent !== texto) el.textContent = texto;
+        });
+        const topbar = document.getElementById('topbarUpdated');
+        if (topbar) topbar.textContent = formatActualizadoTopbar();
+      }
+
+      /* Firma de lo que cambia solo con el paso del tiempo. */
+      function estadoFirmaActual() {
+        const estaciones = state.stations.map(s =>
+          s.id + ':' + computeRainState(s.rainfall_mm, minutosEstacion(s), s.hasSensor)
+        ).join('|');
+        const caminoViejo = minutosCaminoRefresco() > THRESHOLDS.staleMinutes ? '1' : '0';
+        const undos = (state.files || []).map(f =>
+          (f.canUndo && f.publishedAt && Date.now() - f.publishedAt >= 24 * 60 * 60 * 1000) ? '1' : '0'
+        ).join('');
+        return estaciones + '#' + caminoViejo + '#' + undos;
+      }
+
+      function actualizarRelojKiosco() {
+        const reloj = document.getElementById('kioscoClock');
+        if (reloj) reloj.textContent = fechaLargaChile() + ' · Sede Comunitaria';
+      }
+
+      /* Cada segundo: candado y reloj. Cada 15 s: tiempos y estados críticos. */
+      function tickReloj(forzar) {
+        const ahora = Date.now();
+
+        if (ui.sheetType === 'ingreso' && state.lockoutUntil) {
+          if (ahora >= state.lockoutUntil) {
+            state.lockoutUntil = null;
+            state.loginAttempts = 0;
+            ui.loginError = '';
+            ui.loginPin = '';
+            saveState();
+            renderSheet();
+          } else {
+            const cuenta = document.getElementById('lockoutCountdown');
+            if (cuenta) cuenta.textContent = formatCountdown(state.lockoutUntil - ahora);
+          }
+        }
+
+        if (ui.kioscoActive) {
+          const minuto = new Date(ahora).getMinutes();
+          if (minuto !== ui.kioscoMinuto) {
+            ui.kioscoMinuto = minuto;
+            actualizarRelojKiosco();
+          }
+        }
+
+        if (!forzar && ahora - ultimoTick15 < 15000) return;
+        ultimoTick15 = ahora;
+
+        actualizarTiemposEnDOM();
+        checkSessionTimeout(true);
+
+        const firma = estadoFirmaActual();
+        if (firma === ui.firmaTiempos) return;
+        ui.firmaTiempos = firma;
+
+        if (ui.kioscoActive) {
+          renderKiosco();
+          return;
+        }
+
+        const activo = document.activeElement;
+        const escribiendo = activo && /^(INPUT|TEXTAREA|SELECT)$/.test(activo.tagName);
+        if (!escribiendo) {
+          const movil = document.getElementById('topbarMobileStatus');
+          if (movil) movil.innerHTML = statePill(getWorstRainState(), 'rain');
+          renderAll();
+        }
+      }
+
       function initFontToggle() {
         const btn = document.getElementById('btnFontToggle');
         const apply = isLarge => {
@@ -4651,19 +4881,18 @@
           if (ui.tab === 'ahora' && ui.subtab === 'lluvia') renderAll();
         });
 
-        /* Actualización periódica cada 2 minutos del reloj del camino */
-        setInterval(() => {
-          state.roadMinutesSinceRefresh += 2;
-          saveState();
-          if (ui.tab === 'camino' && ui.subtab === 'estado') renderAll();
-        }, 120000);
+        /* Motor de reloj: candado y kiosco cada segundo; tiempos y estados cada 15. */
+        setInterval(() => tickReloj(false), 1000);
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) tickReloj(true);
+        });
 
         /* Fase 2: si Supabase está configurado, se baja el estado publicado.
            Mientras no lo esté, la semilla local manda. */
         if (ALMACEN && ALMACEN.configurado && typeof ALMACEN.traer === 'function') {
           ALMACEN.traer().then(remoto => {
             if (remoto && Array.isArray(remoto.stations) && remoto.stations.length > 0) {
-              state = remoto;
+              state = migrarTiemposEstado(remoto);
               if (typeof ALMACEN.guardarLocal === 'function') ALMACEN.guardarLocal(state);
               renderAll();
             }
@@ -4671,6 +4900,9 @@
         }
 
         parseHash();
+        ui.firmaTiempos = estadoFirmaActual();
+        ui.kioscoMinuto = new Date().getMinutes();
+        tickReloj(true);
       }
 
       init();

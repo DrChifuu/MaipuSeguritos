@@ -66,7 +66,8 @@ validación ocurre en el navegador; sirve para demostrar el flujo, no para prote
 ## Qué puede hacer el sitio
 
 - **Semáforo con cuatro estados** (Normal, Ojo, Peligro, Sin dato) y cifras que siempre dicen
-  hace cuánto se midieron.
+  hace cuánto se midieron. Los tiempos («hace 4 min», «hace 15 horas», «Actualizado ahora») y
+  la cuenta regresiva del bloqueo avanzan solos, sin recargar ni mover el foco.
 - **Registro de lecturas** con teclado numérico, límite de 0 a 300 mm y un decimal, lectura
   atrasada de hasta 7 días y foto comprimida en el mismo navegador.
 - **Validación de a una lectura**: validar, corregir (crea una fila nueva y conserva la

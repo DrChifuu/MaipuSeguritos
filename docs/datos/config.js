@@ -7,7 +7,7 @@ window.MV_CONFIG = {
 
   /* Versión del formato de datos. Si cambia la forma del estado, subir el número:
      el sitio descarta lo guardado y vuelve a la semilla. */
-  version: '2.2.0',
+  version: '2.3.0',
 
   /* Clave con la que se guarda el estado en el navegador. */
   clave: 'maipo_vigia_estado_v2',

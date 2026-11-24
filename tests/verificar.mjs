@@ -155,6 +155,9 @@ class CDP {
     this.sessionId = a.sessionId;
     await this.enviar('Runtime.enable', {}, this.sessionId);
     await this.enviar('Page.enable', {}, this.sessionId);
+    await this.enviar('Page.bringToFront', {}, this.sessionId).catch(() => {});
+    await this.enviar('Emulation.setFocusEmulationEnabled', { enabled: true }, this.sessionId).catch(() => {});
+    await this.enviar('Page.setWebLifecycleState', { state: 'active' }, this.sessionId).catch(() => {});
     return this;
   }
 
@@ -283,7 +286,7 @@ async function pruebasUnitarias() {
     const { almacen, sandbox } = sandboxAlmacen({ supabase: { url: '', anonKey: '' } });
     almacen.guardar({ stations: [{ id: 'a' }], roads: [{ id: 'a' }] });
     const guardado = JSON.parse(sandbox.localStorage.getItem('maipo_vigia_estado_v2'));
-    igual(guardado._version, '2.2.0', 'sello de versión al guardar');
+    igual(guardado._version, sandbox.MV_CONFIG.version, 'sello de versión al guardar');
     guardado._version = '0.0.1';
     sandbox.localStorage.setItem('maipo_vigia_estado_v2', JSON.stringify(guardado));
     verdad(almacen.cargar() === null, 'no descartó una versión distinta');
@@ -526,6 +529,100 @@ async function pruebasE2E(cdp, base) {
     const cuerpo = await e.texto('#sheetBody');
     verdad(/Espera|minutos/.test(cuerpo), 'no apareció el bloqueo: ' + cuerpo.slice(0, 120));
     verdad((await cdp.evaluar(`!!document.getElementById('loginCardInput')`)) === false, 'el formulario sigue activo durante el bloqueo');
+  });
+
+  await prueba('Cuenta regresiva del bloqueo y desbloqueo automático', async () => {
+    const t1 = (await e.texto('#lockoutCountdown')).trim();
+    verdad(/^\d{2}:\d{2}$/.test(t1), 'formato de cuenta regresiva inesperado: ' + t1);
+    /* Dos segundos completos: con Math.ceil el primer tick puede caer dentro
+       del mismo segundo y todavía mostrar 05:00. */
+    await pausa(2300);
+    const t2 = (await e.texto('#lockoutCountdown')).trim();
+    verdad(t2 !== t1, 'la cuenta regresiva no avanzó: ' + t1 + ' → ' + t2);
+
+    await cdp.evaluar(`(() => {
+      window.__realNow = Date.now;
+      const base = Date.now();
+      Date.now = () => base + 5 * 60000 + 2000;
+      document.dispatchEvent(new Event('visibilitychange'));
+      return true;
+    })()`);
+    await pausa(500);
+    const desbloqueado = await cdp.evaluar(`!!document.getElementById('loginCardInput')`);
+    verdad(desbloqueado, 'no se desbloqueó al vencer el plazo');
+    await cdp.evaluar(`(() => { if (window.__realNow) { Date.now = window.__realNow; delete window.__realNow; } return true; })()`);
+    await e.clic('#btnCloseSheet');
+  });
+
+  await prueba('Los tiempos avanzan sin perder el foco ni lo escrito', async () => {
+    await e.reiniciar();
+    await e.clic('#btnOpenLogin');
+    await e.escribir('#loginCardInput', '88');
+    const antes = (await e.texto('#topbarUpdated')).trim();
+    const focoAntes = await cdp.evaluar(`document.activeElement.id`);
+
+    await cdp.evaluar(`(() => {
+      window.__realNow = Date.now;
+      const base = Date.now();
+      Date.now = () => base + 2 * 60000;
+      document.dispatchEvent(new Event('visibilitychange'));
+      return true;
+    })()`);
+    await pausa(500);
+    const despues = (await e.texto('#topbarUpdated')).trim();
+    const valor = await cdp.evaluar(`(document.getElementById('loginCardInput') || {}).value || ''`);
+    const focoDespues = await cdp.evaluar(`document.activeElement.id`);
+    verdad(despues !== antes, 'el texto de actualización no cambió: ' + antes);
+    verdad(/hace 2 min/.test(despues), 'texto inesperado: ' + despues);
+    igual(valor, '88', 'texto escrito en el campo');
+    igual(focoDespues, focoAntes, 'foco tras actualizar tiempos');
+
+    await cdp.evaluar(`(() => { if (window.__realNow) { Date.now = window.__realNow; delete window.__realNow; } return true; })()`);
+    await e.clic('#btnCloseSheet');
+    await e.reiniciar();
+  });
+
+  await prueba('Topbar con tiempo largo no desborda a 1280', async () => {
+    await e.reiniciar();
+    await cdp.evaluar(`(() => {
+      window.__realNow = Date.now;
+      const base = Date.now();
+      Date.now = () => base + 3 * 3600000;
+      document.dispatchEvent(new Event('visibilitychange'));
+      return true;
+    })()`);
+    await pausa(500);
+    const m = await cdp.evaluar(MEDIDAS);
+    verdad(m.docW <= 1280, 'desborde horizontal: ' + m.docW);
+    igual(m.diff, 0, 'scroll interno con texto largo');
+    const texto = (await e.texto('#topbarUpdated')).trim();
+    verdad(/hace 3 h/.test(texto), 'texto largo inesperado: ' + texto);
+    await cdp.evaluar(`(() => { if (window.__realNow) { Date.now = window.__realNow; delete window.__realNow; } return true; })()`);
+    await e.reiniciar();
+  });
+
+  await prueba('Una estación pasa de Normal a Sin dato al vencer su frescura', async () => {
+    const estadoCard = async () => cdp.evaluar(`(() => {
+      const card = [...document.querySelectorAll('.rain-card')]
+        .find(c => (c.querySelector('.rain-point-name') || {}).textContent === 'El Manzano');
+      return card ? card.querySelector('.state-pill').textContent.trim() : '';
+    })()`);
+    const antes = await estadoCard();
+    verdad(/Normal/.test(antes), 'El Manzano no partió en Normal: ' + antes);
+
+    await cdp.evaluar(`(() => {
+      window.__realNow = Date.now;
+      const base = Date.now();
+      Date.now = () => base + 40 * 60000;
+      document.dispatchEvent(new Event('visibilitychange'));
+      return true;
+    })()`);
+    await pausa(700);
+    const despues = await estadoCard();
+    verdad(/Sin dato/.test(despues), 'no pasó a Sin dato: ' + despues);
+
+    await cdp.evaluar(`(() => { if (window.__realNow) { Date.now = window.__realNow; delete window.__realNow; } return true; })()`);
+    await e.reiniciar();
   });
 
   await prueba('Observador entra, registra 5,5 mm y respeta el límite 0–300', async () => {
