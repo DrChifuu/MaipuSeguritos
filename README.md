@@ -69,7 +69,7 @@ docs/                       sitio publicado por GitHub Pages
   LEEME.md                  guía de uso del sitio
   archivo.html, camino.html, …   redirecciones a las pestañas actuales
 tests/verificar.mjs         suite de verificación (fuera del sitio publicado)
-bitacora/                   bitácora del equipo, sesiones S01 a S11
+bitacora/                   bitácora del equipo, sesiones S01 a S12
 ```
 
 ## Bitácora
@@ -87,6 +87,7 @@ bitacora/                   bitácora del equipo, sesiones S01 a S11
 | S09 | Presentación provisional de Maipo Vigía y estado del avance |
 | S10 | Cierre de la Unidad 2, calificación y recepción del kit |
 | S11 | Presentación de avances, actividad de equipo y organización de la feria |
+| S12 | Clase de pitch, presentación de avances y recta final de la Feria Capstone |
 
 ## Abrir en local
 
